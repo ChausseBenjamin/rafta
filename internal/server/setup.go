@@ -22,6 +22,8 @@ func Setup(port int64, storage *sql.DB) (*grpc.Server, net.Listener, error) {
 		return nil, nil, err
 	}
 
+	// FIXME: Implement Auth interceptor
+
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			tagging.UnaryInterceptor,
