@@ -1,0 +1,127 @@
+package app
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
+	"strings"
+
+	"github.com/ChausseBenjamin/rafta/internal/logging"
+	"github.com/ChausseBenjamin/rafta/internal/server"
+	"github.com/urfave/cli/v3"
+)
+
+const (
+	FlagListenPort = "port"
+	FlagLogLevel   = "log-level"
+	FlagLogFormat  = "log-format"
+	FlagLogOutput  = "log-output"
+	FlagDBPath     = "database"
+)
+
+func flags() []cli.Flag {
+	return []cli.Flag{
+		// Logging {{{
+		&cli.StringFlag{
+			Name:    FlagLogFormat,
+			Aliases: []string{"f"},
+			Value:   "plain",
+			Usage:   "plain, json",
+			Sources: cli.EnvVars("LOG_FORMAT"),
+			Action:  validateLogFormat,
+		},
+		&cli.StringFlag{
+			Name:    FlagLogOutput,
+			Aliases: []string{"o"},
+			Value:   "stdout",
+			Usage:   "stdout, stderr, file",
+			Sources: cli.EnvVars("LOG_OUTPUT"),
+			Action:  validateLogOutput,
+		},
+		&cli.StringFlag{
+			Name:    FlagLogLevel,
+			Aliases: []string{"l"},
+			Value:   "info",
+			Usage:   "debug, info, warn, error",
+			Sources: cli.EnvVars("LOG_LEVEL"),
+			Action:  validateLogLevel,
+		}, // }}}
+		// gRPC server {{{
+		&cli.IntFlag{
+			Name:    FlagListenPort,
+			Aliases: []string{"p"},
+			Value:   1234,
+			Sources: cli.EnvVars("LISTEN_PORT"),
+			Action:  validateListenPort,
+		}, // }}}
+		// Database {{{
+		&cli.StringFlag{
+			Name:    FlagDBPath,
+			Aliases: []string{"d"},
+			Value:   "store.db",
+			Usage:   "database file",
+			Sources: cli.EnvVars("DATABASE_PATH"),
+			Action:  validateDBPath,
+		}, // }}}
+	}
+}
+
+func validateLogOutput(ctx context.Context, cmd *cli.Command, s string) error {
+	switch {
+	case s == "stdout" || s == "stderr":
+		return nil
+	default:
+		// assume file
+		f, err := os.OpenFile(s, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			slog.ErrorContext(
+				ctx,
+				fmt.Sprintf("Error creating/accessing provided log file %s", s),
+			)
+			return err
+		}
+		defer f.Close()
+		return nil
+	}
+}
+
+func validateLogLevel(ctx context.Context, cmd *cli.Command, s string) error {
+	for _, lvl := range []string{"deb", "inf", "warn", "err"} {
+		if strings.Contains(strings.ToLower(s), lvl) {
+			return nil
+		}
+	}
+	slog.ErrorContext(
+		ctx,
+		fmt.Sprintf("Unknown log level provided: %s", s),
+	)
+	return logging.ErrInvalidLevel
+}
+
+func validateLogFormat(ctx context.Context, cmd *cli.Command, s string) error {
+	s = strings.ToLower(s)
+	if s == "json" || s == "plain" {
+		return nil
+	}
+	return nil
+}
+
+func validateListenPort(ctx context.Context, cmd *cli.Command, p int64) error {
+	if p < 1024 || p > 65535 {
+		slog.ErrorContext(
+			ctx,
+			fmt.Sprintf("Out-of-bound port provided: %d", p),
+		)
+		return server.ErrOutOfBoundsPort
+	}
+	return nil
+}
+
+func validateDBPath(ctx context.Context, cmd *cli.Command, s string) error {
+	// TODO: Ensure the db file is writable.
+	// TODO: Ensure the db file is a valid sqlite3 db.
+	// TODO: Call db.Reset() if either of the above fail.
+	// TODO: Log the error/crash if the db file is not writable.
+	return nil
+}

@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+import "protobuf/src/google/protobuf/empty.proto";
+import "protobuf/src/google/protobuf/timestamp.proto";
+
+option go_package = "github.com/ChausseBenjamin/rafta/internal/server/model";
+
+enum TaskState {
+  TASK_UNDEFINED = 0;
+  TASK_PENDING = 1;
+  TASK_IN_PROGRESS = 2;
+  TASK_DONE = 3;
+  TASK_BLOCKED = 4;
+}
+
+message UserID {
+  string uuid = 1;
+}
+
+message UserData {
+  string name = 1;
+  string email = 2;
+  google.protobuf.Timestamp created_on = 3;
+  google.protobuf.Timestamp last_login = 4;
+}
+
+message User {
+  UserID id = 1;
+  UserData data = 2;
+}
+
+message TaskID {
+  string uuid = 1;
+}
+
+message TaskData {
+  string title = 1;
+  Description desc = 2; // markdown
+  uint32 priority = 3;
+  TaskState state = 4;
+  google.protobuf.Timestamp created_on = 5;
+  google.protobuf.Timestamp last_updated = 6;
+  repeated string tags = 7;
+}
+
+message Description {
+  string data = 1;
+}
+
+message Task {
+  TaskID id = 1;
+  TaskData data = 2;
+}
+
+message TaskList {
+  repeated Task tasks = 1;
+}
+
+message UserList {
+  repeated User users = 1;
+}
+
+service Rafta {
+  // Retrieval
+  rpc GetUserTasks(UserID) returns (TaskList);
+  rpc GetAllUsers(google.protobuf.Empty) returns (UserList);
+  rpc GetUser(UserID) returns (User);
+  rpc GetTask(TaskID) returns (Task);
+
+  // Task Manipulation
+  rpc DeleteTask(TaskID) returns (google.protobuf.Empty);
+  rpc UpdateTask(Task) returns (Task);
+  rpc CreateTask(TaskData) returns (Task);
+
+  // User Manipulation
+  rpc DeleteUser(UserID) returns (google.protobuf.Empty);
+  rpc UpdateUser(User) returns (User);
+  rpc CreateUser(UserData) returns (User);
+}
