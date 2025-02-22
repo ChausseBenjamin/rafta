@@ -43,6 +43,7 @@ func Setup(lvlStr, fmtStr, outStr string) error {
 	)
 
 	h = withTrackedContext(h, util.ReqIDKey, "request_id")
+	h = withTrackedContext(h, util.ProtoMethodKey, "proto_method")
 	h = withStackTrace(h)
 	slog.SetDefault(slog.New(h))
 	return errors.Join(outputErr, formatErr, levelErr)

@@ -10,9 +10,9 @@ codegen:
 	protoc \
 		--proto_path=resources \
 		--proto_path=external \
-		--go_out=internal/server/model \
+		--go_out=pkg/model \
 		--go_opt=paths=source_relative \
-		--go-grpc_out=internal/server/model \
+		--go-grpc_out=pkg/model \
 		--go-grpc_opt=paths=source_relative \
 		resources/schema.proto
 

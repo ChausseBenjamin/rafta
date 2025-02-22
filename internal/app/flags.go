@@ -6,18 +6,20 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/ChausseBenjamin/rafta/internal/logging"
-	"github.com/ChausseBenjamin/rafta/internal/server"
+	"github.com/ChausseBenjamin/rafta/internal/pb"
 	"github.com/urfave/cli/v3"
 )
 
 const (
-	FlagListenPort = "port"
-	FlagLogLevel   = "log-level"
-	FlagLogFormat  = "log-format"
-	FlagLogOutput  = "log-output"
-	FlagDBPath     = "database"
+	FlagListenPort   = "port"
+	FlagLogLevel     = "log-level"
+	FlagLogFormat    = "log-format"
+	FlagLogOutput    = "log-output"
+	FlagDBPath       = "database"
+	FlagGraceTimeout = "grace-timeout"
 )
 
 func flags() []cli.Flag {
@@ -51,9 +53,15 @@ func flags() []cli.Flag {
 		&cli.IntFlag{
 			Name:    FlagListenPort,
 			Aliases: []string{"p"},
-			Value:   1234,
+			Value:   1157, // list in leetspeek :P
 			Sources: cli.EnvVars("LISTEN_PORT"),
 			Action:  validateListenPort,
+		},
+		&cli.DurationFlag{
+			Name:    FlagGraceTimeout,
+			Aliases: []string{"t"},
+			Value:   5 * time.Second,
+			Sources: cli.EnvVars("GRACEFUL_TIMEOUT"),
 		}, // }}}
 		// Database {{{
 		&cli.StringFlag{
@@ -62,7 +70,6 @@ func flags() []cli.Flag {
 			Value:   "store.db",
 			Usage:   "database file",
 			Sources: cli.EnvVars("DATABASE_PATH"),
-			Action:  validateDBPath,
 		}, // }}}
 	}
 }
@@ -113,15 +120,7 @@ func validateListenPort(ctx context.Context, cmd *cli.Command, p int64) error {
 			ctx,
 			fmt.Sprintf("Out-of-bound port provided: %d", p),
 		)
-		return server.ErrOutOfBoundsPort
+		return pb.ErrOutOfBoundsPort
 	}
-	return nil
-}
-
-func validateDBPath(ctx context.Context, cmd *cli.Command, s string) error {
-	// TODO: Ensure the db file is writable.
-	// TODO: Ensure the db file is a valid sqlite3 db.
-	// TODO: Call db.Reset() if either of the above fail.
-	// TODO: Log the error/crash if the db file is not writable.
 	return nil
 }

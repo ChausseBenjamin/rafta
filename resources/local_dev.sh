@@ -4,8 +4,9 @@ env_vars=$(cat << EOF
   LOG_LEVEL=debug
   LOG_FORMAT=plain
   LOG_OUTPUT=stdout
-  LISTEN_PORT=1234
+  LISTEN_PORT=1157
   DATABASE_PATH=runtime/store.db
+  GRACEFUL_TIMEOUT=1ms
 EOF
 )
 

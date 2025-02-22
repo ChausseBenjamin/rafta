@@ -1,4 +1,4 @@
-package tagging
+package intercept
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 )
 
 // gRPC interceptor to tag requests with a unique identifier
-func UnaryInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func Tagging(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	id, err := uuid.GenerateUUID()
 	if err != nil {
 		slog.Error("Unable to generate UUID for request", logging.ErrKey, err)

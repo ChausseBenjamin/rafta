@@ -3,7 +3,11 @@ syntax = "proto3";
 import "protobuf/src/google/protobuf/empty.proto";
 import "protobuf/src/google/protobuf/timestamp.proto";
 
-option go_package = "github.com/ChausseBenjamin/rafta/internal/server/model";
+option go_package = "github.com/ChausseBenjamin/rafta/pkg/model";
+
+message UUID {
+	string value = 1;
+}
 
 enum TaskState {
   TASK_UNDEFINED = 0;
@@ -11,10 +15,6 @@ enum TaskState {
   TASK_IN_PROGRESS = 2;
   TASK_DONE = 3;
   TASK_BLOCKED = 4;
-}
-
-message UserID {
-  string uuid = 1;
 }
 
 message UserData {
@@ -25,30 +25,47 @@ message UserData {
 }
 
 message User {
-  UserID id = 1;
+  UUID id = 1;
   UserData data = 2;
 }
 
-message TaskID {
-  string uuid = 1;
+// Used only by admin users to create users manually since he cannot use it's
+// own jwt to create a non admin user.
+message UserCreationMsg {
+	UserData userData = 1;
+	string userSecret = 2;
+}
+
+message TaskRecurrence {
+	string cron = 1;
+	bool active = 2;
 }
 
 message TaskData {
   string title = 1;
-  Description desc = 2; // markdown
-  uint32 priority = 3;
+  string desc = 2; // markdown
+	// Intentionally vague for easy client implementation:
+  uint32 priority = 3; // 0=undefined, 1=highest, 0xFFFFFFFF=lowest
   TaskState state = 4;
-  google.protobuf.Timestamp created_on = 5;
-  google.protobuf.Timestamp last_updated = 6;
-  repeated string tags = 7;
+	TaskRecurrence recurrence = 5;
+  google.protobuf.Timestamp created_on = 6;
+  google.protobuf.Timestamp last_updated = 7;
+  repeated string tags = 8;
 }
 
-message Description {
-  string data = 1;
+message TaskUpdate {
+	UUID id = 1;
+	oneof field {
+		string title = 2;
+		string desc = 3;
+		uint32 priority = 4;
+		TaskState state = 5;
+		TaskRecurrence recurrence = 6;
+	}
 }
 
 message Task {
-  TaskID id = 1;
+  UUID id = 1;
   TaskData data = 2;
 }
 
@@ -60,20 +77,34 @@ message UserList {
   repeated User users = 1;
 }
 
-service Rafta {
-  // Retrieval
-  rpc GetUserTasks(UserID) returns (TaskList);
-  rpc GetAllUsers(google.protobuf.Empty) returns (UserList);
-  rpc GetUser(UserID) returns (User);
-  rpc GetTask(TaskID) returns (Task);
+// Accessible to all users once authenticated
+// User can only manipulate its own data
+service RaftaUser {
+	// Retrieval
+  rpc GetUserInfo(google.protobuf.Empty) returns (User);
+  rpc GetTask(UUID) returns (Task);
+
+	// User Manipulation
+	rpc NewUser(UserData) returns (User);
+	rpc UpdateUserInfo(User) returns (google.protobuf.Empty);
+	// Input is empty because user should be authenticated via JWT
+	rpc DeleteUser(google.protobuf.Empty) returns (google.protobuf.Empty);
 
   // Task Manipulation
-  rpc DeleteTask(TaskID) returns (google.protobuf.Empty);
-  rpc UpdateTask(Task) returns (Task);
+  rpc DeleteTask(UUID) returns (google.protobuf.Empty);
+  rpc UpdateTask(TaskUpdate) returns (google.protobuf.Empty);
   rpc CreateTask(TaskData) returns (Task);
+}
+
+// Accessible only to users with the admin role
+service RaftaAdmin {
+  // Retrieval
+  rpc GetUserTasks(UUID) returns (TaskList);
+  rpc GetAllUsers(google.protobuf.Empty) returns (UserList);
+  rpc GetUser(UUID) returns (User);
 
   // User Manipulation
-  rpc DeleteUser(UserID) returns (google.protobuf.Empty);
-  rpc UpdateUser(User) returns (User);
-  rpc CreateUser(UserData) returns (User);
+  rpc DeleteUser(UUID) returns (google.protobuf.Empty);
+  rpc UpdateUser(User) returns (google.protobuf.Empty);
+  rpc CreateUser(UserCreationMsg) returns (User);
 }
