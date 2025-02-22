@@ -30,7 +30,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	slog.InfoContext(ctx, "Starting rafta server")
 
 	errAppChan := make(chan error)
-	readyChan := make(chan bool)
 	shutdownDone := make(chan struct{}) // Signals when graceful shutdown is complete
 
 	var once sync.Once
@@ -66,7 +65,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			return
 		}
 		slog.InfoContext(ctx, "Server listening", "port", cmd.Int(FlagListenPort))
-		readyChan <- true
 
 		if err := server.Serve(listener); err != nil {
 			errAppChan <- err
