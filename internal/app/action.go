@@ -54,11 +54,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		}
 
 		brutalShutdown = func() {
-			once.Do(func() { // Ensure graceful shutdown isn't re-executed
-				slog.WarnContext(ctx, "Graceful shutdown delay exceeded, shutting down NOW!")
-				server.Stop()
-				store.Close()
-			})
+			slog.WarnContext(ctx, "Graceful shutdown delay exceeded, shutting down NOW!")
+			server.Stop()
+			store.Close()
 		}
 
 		port := fmt.Sprintf(":%d", cmd.Int(FlagListenPort))
@@ -90,9 +88,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			go gracefulShutdown()
 
 			select {
-			case <-shutdownDone: // If graceful shutdown completes in time, exit normally
 			case <-time.After(cmd.Duration(FlagGraceTimeout)): // Timeout exceeded
 				brutalShutdown()
+			case <-shutdownDone: // If graceful shutdown completes in time, exit normally
 			}
 			running = false
 		}

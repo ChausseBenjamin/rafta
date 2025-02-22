@@ -59,8 +59,8 @@ func opts() string {
 }
 
 // Setup opens the SQLite DB at path, verifies its integrity and schema,
-// and returns the valid DB handle. If any check fails, it backs up the old file
-// and reinitializes the DB using the schema definitions.
+// and returns the valid DB handle. If any check fails, it backs up the old
+// file and reinitializes the DB using the schema definitions.
 func Setup(ctx context.Context, path string) (*Store, error) {
 	slog.DebugContext(ctx, "Setting up database connection")
 
