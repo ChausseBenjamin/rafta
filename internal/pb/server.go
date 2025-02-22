@@ -15,21 +15,21 @@ var ErrOutOfBoundsPort = errors.New("given port is out of bounds (1024-65535)")
 
 // Implements ComsServer interface
 type UserServer struct {
-	db *db.Store
+	store *db.Store
 	m.UnimplementedRaftaUserServer
 }
 
 type AdminServer struct {
-	db *db.Store
+	store *db.Store
 	m.UnimplementedRaftaAdminServer
 }
 
 func NewUserServer(store *db.Store) *UserServer {
-	return &UserServer{db: store}
+	return &UserServer{store: store}
 }
 
 func NewAdminServer(store *db.Store) *AdminServer {
-	return &AdminServer{db: store}
+	return &AdminServer{store: store}
 }
 
 // Setup creates a new gRPC with both services
@@ -40,7 +40,7 @@ func Setup(ctx context.Context, store *db.Store) (*grpc.Server, error) {
 		intercept.Tagging,
 	))
 
-	m.RegisterRaftaUserServer(server, NewUserServer(store))
+	// m.RegisterRaftaUserServer(server, NewUserServer(store))
 	m.RegisterRaftaAdminServer(server, NewAdminServer(store))
 
 	return server, nil

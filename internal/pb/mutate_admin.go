@@ -2,19 +2,42 @@ package pb
 
 import (
 	"context"
+	"log/slog"
 
+	"github.com/ChausseBenjamin/rafta/internal/db"
+	"github.com/ChausseBenjamin/rafta/internal/logging"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func (s *AdminServer) DeleteUser(ctx context.Context, id *m.UUID) (*emptypb.Empty, error) {
-	return nil, nil
+	slog.InfoContext(ctx, "Received admin request to delete user")
+	cmd := s.store.Common[db.DeleteUser]
+	resp, err := cmd.ExecContext(ctx, id.Value)
+	if err != nil {
+		slog.ErrorContext(ctx, "Admin request to delete user failed",
+			logging.ErrKey, err,
+			db.RespMsgKey, resp,
+		)
+		return nil, err
+	}
+	if i, err := resp.RowsAffected(); i == 0 && err == nil {
+		return nil, status.Errorf(codes.NotFound,
+			"User %s does not exist in the database", id.Value,
+		)
+	}
+	slog.InfoContext(ctx, "deleted user", db.RespMsgKey, resp)
+	return &emptypb.Empty{}, nil
 }
 
 func (s *AdminServer) UpdateUser(ctx context.Context, val *m.User) (*emptypb.Empty, error) {
+	slog.InfoContext(ctx, "Received admin request to update user")
 	return nil, nil
 }
 
 func (s *AdminServer) CreateUser(ctx context.Context, val *m.UserCreationMsg) (*m.User, error) {
+	slog.InfoContext(ctx, "Received admin request to create user")
 	return nil, nil
 }

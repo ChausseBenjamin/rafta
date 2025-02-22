@@ -1,5 +1,7 @@
 package db
 
+const RespMsgKey = "database_response"
+
 type transactionName int
 
 const (
@@ -7,20 +9,20 @@ const (
 	CreateUserSecret
 	CreateTag
 	CreateRole
-	RemoveUser
-	RemoveRole
-	RemoveUnusedTags
-	AssignRoleToUser
-	AssignTagToTask
-	RemoveRoleFromUser
-	RemoveTagFromTask
-	UpdateSetting
+	DeleteUser
+	DeleteRole
+	DeleteUnusedTags
+	DeleteRoleFromUser
+	DeleteTagFromTask
 	GetSingleUser
 	GetAllUsers
 	GetSingleTask
 	GetAllTasks
 	GetSingleUserWithSecretAndRoles
 	GetAllTagsRelatedToTask
+	AssignRoleToUser
+	AssignTagToTask
+	UpdateSetting
 )
 
 var commonTransactions = [...]struct {
@@ -44,15 +46,15 @@ var commonTransactions = [...]struct {
 		Cmd:  "INSERT INTO Roles (role) VALUES (?)",
 	},
 	{ // Remove a user
-		Name: RemoveUser,
+		Name: DeleteUser,
 		Cmd:  "DELETE FROM Users WHERE userID = ?",
 	},
 	{ // Remove a role
-		Name: RemoveRole,
+		Name: DeleteRole,
 		Cmd:  "DELETE FROM Roles WHERE role = ?",
 	},
 	{ // Remove unused tags (assigned to no tasks)
-		Name: RemoveUnusedTags,
+		Name: DeleteUnusedTags,
 		Cmd:  "DELETE FROM Tags WHERE tagID NOT IN (SELECT tagID FROM TaskTags)",
 	},
 	{ // Assign a new role to a user
@@ -64,11 +66,11 @@ var commonTransactions = [...]struct {
 		Cmd:  "INSERT INTO TaskTags (taskID, tagID) VALUES (?, ?)",
 	},
 	{ // Remove a role from a user
-		Name: RemoveRoleFromUser,
+		Name: DeleteRoleFromUser,
 		Cmd:  "DELETE FROM UserRoles WHERE userID = ? AND role = ?",
 	},
 	{ // Remove a tag from a task
-		Name: RemoveTagFromTask,
+		Name: DeleteTagFromTask,
 		Cmd:  "DELETE FROM TaskTags WHERE taskID = ? AND tagID = ?",
 	},
 	{ // Update a setting KeyPair
