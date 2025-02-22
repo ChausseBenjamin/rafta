@@ -88,7 +88,7 @@ var schemaDefinitions = [...]struct {
 
 // genDB creates a new database at path using the expected schema definitions.
 func genDB(ctx context.Context, path string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", path)
+	db, err := sql.Open("sqlite", path+opts())
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to create DB", "error", err)
 		return nil, err
@@ -125,6 +125,6 @@ func genDB(ctx context.Context, path string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	slog.InfoContext(ctx, "created new blank DB wit h valid schema", "path", path)
+	slog.InfoContext(ctx, "created new blank DB with valid schema", "path", path)
 	return db, nil
 }

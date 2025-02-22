@@ -6,7 +6,7 @@ import (
 
 const (
 	AppName  = "rafta"
-	AppUsage = "Really, Another Freaking Todo App?!"
+	AppUsage = "Really, Another F*cking Todo App?!"
 )
 
 var version = "COMPILED"

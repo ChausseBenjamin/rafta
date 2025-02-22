@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 var (
@@ -73,7 +73,7 @@ func Setup(ctx context.Context, path string) (*Store, error) {
 		return new(db)
 	}
 
-	db, err := sql.Open("sqlite3", path+opts())
+	db, err := sql.Open("sqlite", path+opts())
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to open DB", "error", err)
 		backupFile(ctx, path)
@@ -82,6 +82,16 @@ func Setup(ctx context.Context, path string) (*Store, error) {
 			return nil, err
 		}
 		return new(db)
+	}
+
+	_, err = db.Exec("PRAGMA foreign_keys = ON")
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = db.Exec("PRAGMA journal_mode=WAL")
+	if err != nil {
+		return nil, err
 	}
 
 	// Run integrity check.

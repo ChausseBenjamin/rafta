@@ -21,7 +21,7 @@ clean:
 
 compile:
 	mkdir -p $(BUILD_DIR) || exit 1
-	CGO_ENABLED=1 go run ./internal/manualgen > $(BUILD_DIR)/$(APP).1
+	CGO_ENABLED=1 go run ./internal/autogen > $(BUILD_DIR)/$(APP).1
 	CGO_ENABLED=1 go build -o $(BUILD_DIR)/$(APP) .
 
 .PHONY: run

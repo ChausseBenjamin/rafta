@@ -1,23 +1,21 @@
-FROM golang:latest AS setup
-WORKDIR /app
+FROM golang:latest AS compile
+WORKDIR /build
 
-COPY go.* ./
-COPY cmd cmd
-COPY internal internal
-
+COPY . .
 RUN go mod download && go mod verify
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /application cmd/songlinkr/main.go
+# Enable static linking for scratch
+RUN CGO_ENABLED=0 GOOS=linux go build -o /application -ldflags="-s -w" main.go
 
 FROM alpine:latest AS compressor
-
 RUN apk add --no-cache upx
-
-COPY --from=setup
+COPY --from=compile /application /application
+RUN upx --best /application
 
 FROM scratch AS package
 
-COPY --from=setup /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=setup /application /application
+# Copy CA certificates
+COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=compressor /application /application
 
-CMD ["/application"]
+ENTRYPOINT ["/application"]
