@@ -7,6 +7,7 @@ require (
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/urfave/cli-docs/v3 v3.0.0-alpha6
 	github.com/urfave/cli/v3 v3.0.0-beta1
+	golang.org/x/crypto v0.30.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/protobuf v1.36.4
 	modernc.org/sqlite v1.35.0

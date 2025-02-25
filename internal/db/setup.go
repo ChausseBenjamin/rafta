@@ -63,21 +63,22 @@ func opts() string {
 // file and reinitializes the DB using the schema definitions.
 func Setup(ctx context.Context, path string) (*Store, error) {
 	slog.DebugContext(ctx, "Setting up database connection")
+	var db *sql.DB
+	var err error
 
 	// If file does not exist, generate a new DB.
 	if _, err := os.Stat(path); err != nil {
-		db, err := genDB(ctx, path)
+		_, err = genDB(ctx, path)
 		if err != nil {
 			return nil, err
 		}
-		return new(db)
 	}
 
-	db, err := sql.Open("sqlite", path+opts())
+	db, err = sql.Open("sqlite", path+opts())
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to open DB", "error", err)
 		backupFile(ctx, path)
-		db, err := genDB(ctx, path)
+		db, err = genDB(ctx, path)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +105,7 @@ func Setup(ctx context.Context, path string) (*Store, error) {
 		}
 		db.Close()
 		backupFile(ctx, path)
-		db, err := genDB(ctx, path)
+		db, err = genDB(ctx, path)
 		if err != nil {
 			return nil, err
 		}
@@ -116,11 +117,21 @@ func Setup(ctx context.Context, path string) (*Store, error) {
 		slog.ErrorContext(ctx, "schema validation failed", "error", err)
 		db.Close()
 		backupFile(ctx, path)
-		db, err := genDB(ctx, path)
+		db, err = genDB(ctx, path)
 		if err != nil {
 			return nil, err
 		}
 		return new(db)
+	}
+
+	// Validate necessary settings exist in the database
+	if err := validateSettings(ctx, db); err != nil {
+		return nil, err
+	}
+
+	// Ensure there is at least one admin user in the database
+	if err := validateAdmin(ctx, db); err != nil {
+		return nil, err
 	}
 
 	return new(db)

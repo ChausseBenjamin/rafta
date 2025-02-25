@@ -36,8 +36,3 @@ func (s *AdminServer) UpdateUser(ctx context.Context, val *m.User) (*emptypb.Emp
 	slog.InfoContext(ctx, "Received admin request to update user")
 	return nil, nil
 }
-
-func (s *AdminServer) CreateUser(ctx context.Context, val *m.UserCreationMsg) (*m.User, error) {
-	slog.InfoContext(ctx, "Received admin request to create user")
-	return nil, nil
-}

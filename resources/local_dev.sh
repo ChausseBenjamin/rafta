@@ -6,12 +6,12 @@ env_vars=$(cat << EOF
   LOG_OUTPUT=stdout
   LISTEN_PORT=1157
   DATABASE_PATH=runtime/store.db
-  GRACEFUL_TIMEOUT=1ms
+  GRACEFUL_TIMEOUT=200ms
 EOF
 )
 
 case "$1" in
-  --get-config)
+  --print-config)
     echo "$env_vars"
     ;;
   *)

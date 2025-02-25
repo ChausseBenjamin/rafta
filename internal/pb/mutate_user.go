@@ -28,11 +28,6 @@ func (s *UserServer) DeleteTask(ctx context.Context, val *m.UUID) (*emptypb.Empt
 	return nil, nil
 }
 
-func (s *UserServer) UpdateTask(ctx context.Context, val *m.TaskUpdate) (*emptypb.Empty, error) {
-	ctx = context.WithValue(ctx, util.ProtoMethodKey, "UpdateTask")
-	return nil, nil
-}
-
 func (s *UserServer) CreateTask(ctx context.Context, val *m.TaskData) (*m.Task, error) {
 	ctx = context.WithValue(ctx, util.ProtoMethodKey, "CreateTask")
 	return nil, nil
