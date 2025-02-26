@@ -13,13 +13,19 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+// Avoids string mismatches when calling cmd.String(), cmd.Int(), etc...
 const (
-	FlagListenPort   = "port"
-	FlagLogLevel     = "log-level"
-	FlagLogFormat    = "log-format"
-	FlagLogOutput    = "log-output"
-	FlagDBPath       = "database"
-	FlagGraceTimeout = "grace-timeout"
+	FlagConfigPath       = "config"
+	FlagDBPath           = "database"
+	FlagDisableHTTPS     = "disable-https"
+	FlagDisablePubSignup = "disable-public-signups"
+	FlagGraceTimeout     = "grace-timeout"
+	FlagListenPort       = "port"
+	FlagLogFormat        = "log-format"
+	FlagLogLevel         = "log-level"
+	FlagLogOutput        = "log-output"
+	FlagMaxUserSignup    = "max-users"
+	FlagSecretsPath      = "secrets-path"
 )
 
 func flags() []cli.Flag {
@@ -49,13 +55,19 @@ func flags() []cli.Flag {
 			Sources: cli.EnvVars("LOG_LEVEL"),
 			Action:  validateLogLevel,
 		}, // }}}
-		// gRPC server {{{
+		// gRPC {{{
 		&cli.IntFlag{
 			Name:    FlagListenPort,
 			Aliases: []string{"p"},
-			Value:   1157, // list in leetspeek :P
+			Value:   1157, // list in leetspeak :P
 			Sources: cli.EnvVars("LISTEN_PORT"),
 			Action:  validateListenPort,
+		},
+		&cli.BoolFlag{
+			Name:    FlagDisableHTTPS,
+			Value:   false,
+			Usage:   `Disable secure https communication. WARNING: Be very careful using this. Only do this if your server is behind a reverse proxy that already handles https for it and you trust all network communications on that network.`,
+			Sources: cli.EnvVars("DISABLE_HTTPS"),
 		},
 		&cli.DurationFlag{
 			Name:    FlagGraceTimeout,
@@ -70,6 +82,23 @@ func flags() []cli.Flag {
 			Value:   "store.db",
 			Usage:   "database file",
 			Sources: cli.EnvVars("DATABASE_PATH"),
+		}, // }}}
+		// Service {{{
+		&cli.StringFlag{
+			Name:  FlagSecretsPath,
+			Value: "/etc/secrets",
+			Usage: "Directory containing necessary secrets (ca_certs, private keys, etc...)",
+		},
+		&cli.UintFlag{
+			Name:    FlagMaxUserSignup,
+			Value:   25,
+			Usage:   "Maximum number of users that can get created without admin intervention",
+			Sources: cli.EnvVars("MAX_USERS"),
+		},
+		&cli.BoolFlag{
+			Name:    FlagDisablePubSignup,
+			Usage:   "Deactivate public (non admin-based) signups",
+			Sources: cli.EnvVars("DISABLE_PUBLIC_SIGNUP"),
 		}, // }}}
 	}
 }

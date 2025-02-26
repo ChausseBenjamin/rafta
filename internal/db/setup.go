@@ -124,11 +124,6 @@ func Setup(ctx context.Context, path string) (*Store, error) {
 		return new(db)
 	}
 
-	// Validate necessary settings exist in the database
-	if err := validateSettings(ctx, db); err != nil {
-		return nil, err
-	}
-
 	// Ensure there is at least one admin user in the database
 	if err := validateAdmin(ctx, db); err != nil {
 		return nil, err

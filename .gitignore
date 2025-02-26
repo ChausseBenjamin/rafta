@@ -1,3 +1,5 @@
 build/
 runtime/
 docker-compose.yml
+rafta
+store.db
