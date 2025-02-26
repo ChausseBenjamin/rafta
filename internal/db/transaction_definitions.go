@@ -18,7 +18,7 @@ const (
 	GetAllUsers
 	GetSingleTask
 	GetAllTasks
-	GetSingleUserWithSecretAndRoles
+	GetSingleUserWithSecret
 	GetAllTagsRelatedToTask
 	AssignRoleToUser
 	AssignTagToTask
@@ -94,12 +94,19 @@ var commonTransactions = [...]struct {
 		Cmd:  "SELECT * FROM Tasks",
 	},
 	{ // Get a single user with secret info and roles
-		Name: GetSingleUserWithSecretAndRoles,
-		Cmd: `SELECT u.*, us.saltAndHash, ur.role
-				FROM Users u
-				JOIN UserSecrets us ON u.userID = us.userID
-				LEFT JOIN UserRoles ur ON u.userID = ur.userID
-				WHERE u.userID = ?`,
+		Name: GetSingleUserWithSecret,
+		Cmd: `SELECT
+			Users.name,
+			Users.userID,
+			Users.createdAt,
+			Users.updatedAt,
+			UserSecrets.saltAndHash
+		FROM
+			Users
+		JOIN
+				UserSecrets ON Users.userID = UserSecrets.userID
+		WHERE
+			Users.email = ?`,
 	},
 	{ // Get all tags related to a task
 		Name: GetAllTagsRelatedToTask,

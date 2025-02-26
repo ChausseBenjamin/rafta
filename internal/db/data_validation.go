@@ -45,6 +45,7 @@ func validateSettings(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		return err
 	}
+	// nolint:errcheck
 	defer func() {
 		if p := recover(); p != nil {
 			tx.Rollback()
