@@ -6,4 +6,6 @@ const (
 	DBKey ContextKey = iota
 	ReqIDKey
 	ProtoMethodKey
+	ProtoServerKey
+	CredentialsKey
 )

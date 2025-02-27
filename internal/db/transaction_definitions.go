@@ -4,6 +4,7 @@ const RespMsgKey = "database_response"
 
 type transactionName int
 
+// XXX: Make sure iota length is always the same as commonTransactions
 const (
 	CreateUser transactionName = iota
 	CreateUserSecret

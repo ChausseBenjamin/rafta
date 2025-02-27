@@ -24,7 +24,7 @@ const (
 	FlagLogFormat        = "log-format"
 	FlagLogLevel         = "log-level"
 	FlagLogOutput        = "log-output"
-	FlagMaxUserSignup    = "max-users"
+	FlagMaxUsers         = "max-users"
 	FlagSecretsPath      = "secrets-path"
 )
 
@@ -63,7 +63,7 @@ func flags() []cli.Flag {
 			Sources: cli.EnvVars("LISTEN_PORT"),
 			Action:  validateListenPort,
 		},
-		&cli.BoolFlag{
+		&cli.BoolFlag{ // TODO: Implement https
 			Name:    FlagDisableHTTPS,
 			Value:   false,
 			Usage:   `Disable secure https communication. WARNING: Be very careful using this. Only do this if your server is behind a reverse proxy that already handles https for it and you trust all network communications on that network.`,
@@ -85,17 +85,18 @@ func flags() []cli.Flag {
 		}, // }}}
 		// Service {{{
 		&cli.StringFlag{
-			Name:  FlagSecretsPath,
-			Value: "/etc/secrets",
-			Usage: "Directory containing necessary secrets (ca_certs, private keys, etc...)",
+			Name:    FlagSecretsPath,
+			Value:   "/etc/secrets",
+			Usage:   "Directory containing necessary secrets (ca_certs, private keys, etc...)",
+			Sources: cli.EnvVars("SECRETS_PATH"),
 		},
-		&cli.UintFlag{
-			Name:    FlagMaxUserSignup,
+		&cli.UintFlag{ // TODO: uttilize MAX_USERS
+			Name:    FlagMaxUsers,
 			Value:   25,
 			Usage:   "Maximum number of users that can get created without admin intervention",
 			Sources: cli.EnvVars("MAX_USERS"),
 		},
-		&cli.BoolFlag{
+		&cli.BoolFlag{ // TODO: uttilize DISABLE_PUBLIC_SIGNUP
 			Name:    FlagDisablePubSignup,
 			Usage:   "Deactivate public (non admin-based) signups",
 			Sources: cli.EnvVars("DISABLE_PUBLIC_SIGNUP"),

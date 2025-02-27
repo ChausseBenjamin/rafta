@@ -1,5 +1,10 @@
 #!/bin/sh
 
+localsecrets=".secrets"
+
+mkdir -p "$localsecrets" || exit 1
+[ -f "$localsecrets/.gitignore" ] || echo '*' > "$localsecrets/.gitignore"
+
 env_vars=$(cat << EOF
   LOG_LEVEL=debug
   LOG_FORMAT=plain
@@ -7,6 +12,7 @@ env_vars=$(cat << EOF
   LISTEN_PORT=1157
   DATABASE_PATH=runtime/store.db
   GRACEFUL_TIMEOUT=200ms
+  SECRETS_PATH=$localsecrets
 EOF
 )
 

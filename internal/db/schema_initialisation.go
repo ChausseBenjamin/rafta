@@ -62,10 +62,10 @@ var schemaDefinitions = [...]struct {
 		);`,
 	},
 	{
-		"Settings",
-		`CREATE TABLE Settings (
-			key TEXT PRIMARY KEY,
-			value TEXT
+		"RevokedTokens", // jwt token blacklist
+		`CREATE TABLE RevokedTokens (
+			tokenID TEXT PRIMARY KEY,
+			expiration TIMESTAMP
 		);`,
 	},
 	{

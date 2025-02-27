@@ -14,6 +14,7 @@ import (
 	"github.com/ChausseBenjamin/rafta/internal/db"
 	"github.com/ChausseBenjamin/rafta/internal/logging"
 	"github.com/ChausseBenjamin/rafta/internal/pb"
+	"github.com/ChausseBenjamin/rafta/internal/secrets"
 	"github.com/urfave/cli/v3"
 	"google.golang.org/grpc"
 )
@@ -25,12 +26,14 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		cmd.String(FlagLogOutput),
 	)
 	if err != nil {
-		slog.WarnContext(ctx, "Error(s) occurred during logger initialization", logging.ErrKey, err)
+		slog.WarnContext(ctx, "Error(s) occurred during logger initialization",
+			logging.ErrKey, err,
+		)
 	}
 	slog.InfoContext(ctx, "Starting rafta server")
 
 	errAppChan := make(chan error)
-	shutdownDone := make(chan struct{}) // Signals when graceful shutdown is complete
+	shutdownDone := make(chan struct{}) // Signals when graceful shutdown is done
 
 	var once sync.Once
 	gracefulShutdown := func() {}
@@ -88,7 +91,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			select {
 			case <-time.After(cmd.Duration(FlagGraceTimeout)): // Timeout exceeded
 				brutalShutdown()
-			case <-shutdownDone: // If graceful shutdown completes in time, exit normally
+			case <-shutdownDone: // If graceful shutdown is timely, exit normally
 			}
 			running = false
 		}
@@ -103,13 +106,18 @@ func waitForTermChan() chan os.Signal {
 }
 
 func initApp(ctx context.Context, cmd *cli.Command) (*grpc.Server, *db.Store, error) {
+	vault, err := secrets.NewDirVault(cmd.String(FlagSecretsPath))
+	if err != nil {
+		return nil, nil, err
+	}
+
 	store, err := db.Setup(ctx, cmd.String(FlagDBPath))
 	if err != nil {
 		slog.ErrorContext(ctx, "Unable to setup database", logging.ErrKey, err)
 		return nil, nil, err
 	}
 
-	server, err := pb.Setup(ctx, store)
+	server, err := pb.Setup(ctx, store, vault)
 	if err != nil {
 		slog.ErrorContext(ctx, "Unable to setup gRPC server", logging.ErrKey, err)
 		return nil, nil, err

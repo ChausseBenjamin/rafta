@@ -4,6 +4,7 @@ go 1.23.4
 
 require (
 	github.com/charmbracelet/log v0.4.0
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/urfave/cli-docs/v3 v3.0.0-alpha6
 	github.com/urfave/cli/v3 v3.0.0-beta1

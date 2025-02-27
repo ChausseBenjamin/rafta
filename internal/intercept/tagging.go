@@ -10,14 +10,15 @@ import (
 	"google.golang.org/grpc"
 )
 
-// gRPC interceptor to tag requests with a unique identifier
+// gRPC interceptor to tag requests with a unique identifier and other unique attributes to ease logging
 func Tagging(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	id, err := uuid.GenerateUUID()
 	if err != nil {
 		slog.Error("Unable to generate UUID for request", logging.ErrKey, err)
 	}
 	ctx = context.WithValue(ctx, util.ReqIDKey, id)
-	slog.DebugContext(ctx, "Tagging request with UUID", "value", id)
+	ctx = context.WithValue(ctx, util.ProtoServerKey, info.Server)
+	ctx = context.WithValue(ctx, util.ProtoMethodKey, info.FullMethod)
 
 	return handler(ctx, req)
 }

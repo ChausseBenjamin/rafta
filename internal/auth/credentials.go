@@ -52,7 +52,8 @@ func GenerateHash(secret string) (string, error) {
 }
 
 // ValidateCreds validates the provided secret against the stored hash.
-// The stored hash is expected to be in the format "salt$hash", both base64 encoded.
+// The stored hash is expected to be in the format "salt$hash", both base64
+// encoded.
 func ValidateCreds(secret, stored string) error {
 	parts := strings.Split(stored, "$")
 	if len(parts) != 2 {
