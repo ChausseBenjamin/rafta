@@ -18,9 +18,15 @@ type AuthManager struct {
 	db    *sql.DB
 }
 
+type claims struct {
+	UserID string   `json:"uuid"`
+	Roles  []string `json:"roles"`
+	jwt.RegisteredClaims
+}
+
 type credentials struct {
-	claims jwt.RegisteredClaims
-	roles  []string
+	UserID string
+	Roles  []string
 }
 
 // Authenticating returns an interceptor that retrieves a jwt from the header
@@ -53,7 +59,7 @@ func (a *AuthManager) Validate(token string) (credentials, error) {
 	return credentials{}, nil
 }
 
-func (a *AuthManager) Issue() {
+func (a *AuthManager) Issue() jwt.Token {
 	panic("unimplemented")
 }
 
