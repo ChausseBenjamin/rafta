@@ -56,7 +56,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		}
 
 		brutalShutdown = func() {
-			slog.WarnContext(ctx, "Graceful shutdown delay exceeded, shutting down NOW!")
+			slog.WarnContext(ctx,
+				"Graceful shutdown delay exceeded, shutting down NOW!",
+			)
 			server.Stop()
 			store.Close()
 		}

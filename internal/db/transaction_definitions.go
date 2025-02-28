@@ -24,6 +24,7 @@ const (
 	AssignRoleToUser
 	AssignTagToTask
 	UpdateSetting
+	GetUserRoles
 )
 
 var commonTransactions = [...]struct {
@@ -114,5 +115,9 @@ var commonTransactions = [...]struct {
 		Cmd: `SELECT t.* FROM Tags t
 				JOIN TaskTags tt ON t.tagID = tt.tagID
 				WHERE tt.taskID = ?`,
+	},
+	{ // Get all the roles assigned to a user
+		Name: GetUserRoles,
+		Cmd:  `SELECT role FROM UserRoles WHERE userID = ?`,
 	},
 }

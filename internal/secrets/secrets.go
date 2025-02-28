@@ -10,8 +10,8 @@ import (
 type Secret string
 
 type SecretVault interface {
-	Get(string) (Secret, error)
-	Set(string, string) error
+	Get(key string) (Secret, error)
+	Set(key string, val Secret) error
 }
 
 type DirVault struct {
@@ -36,7 +36,7 @@ func (src *DirVault) Get(key string) (Secret, error) {
 
 // This is here so a private key for JWT can be generated
 // and still exists after a service restart.
-func (src *DirVault) Set(key, val string) error {
+func (src *DirVault) Set(key string, val Secret) error {
 	filePath := filepath.Join(src.dir, key)
 	err := os.WriteFile(filePath, []byte(val), 0600)
 	if err != nil {
