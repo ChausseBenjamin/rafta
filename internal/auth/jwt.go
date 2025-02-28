@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/ChausseBenjamin/rafta/internal/secrets"
@@ -75,6 +76,7 @@ func (a *AuthManager) Authenticating() grpc.UnaryServerInterceptor {
 
 func (a *AuthManager) Validate(token string) (credentials, error) {
 	// TODO: Implement validation
+	slog.Error("TOKEN VALIDATION IS NOT IMPLEMENTED YET...")
 	return credentials{}, nil
 }
 
@@ -127,7 +129,7 @@ func (a *AuthManager) Issue(userID string, roles []string) (string, string, erro
 
 // Renew
 func (a *AuthManager) Renew(token jwt.Token) {
-	panic("unimplemented")
+	slog.Error("TOKEN VALIDATION IS NOT IMPLEMENTED YET...")
 }
 
 // Revoke adds a tokens uuid to the database and start a goroutine to clean it

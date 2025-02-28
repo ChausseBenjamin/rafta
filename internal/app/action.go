@@ -15,6 +15,7 @@ import (
 	"github.com/ChausseBenjamin/rafta/internal/logging"
 	"github.com/ChausseBenjamin/rafta/internal/pb"
 	"github.com/ChausseBenjamin/rafta/internal/secrets"
+	"github.com/ChausseBenjamin/rafta/internal/util"
 	"github.com/urfave/cli/v3"
 	"google.golang.org/grpc"
 )
@@ -108,6 +109,13 @@ func waitForTermChan() chan os.Signal {
 }
 
 func initApp(ctx context.Context, cmd *cli.Command) (*grpc.Server, *db.Store, error) {
+	globalConf := &util.ConfigStore{
+		AllowNewUsers: !cmd.Bool(FlagDisablePubSignup),
+		MaxUsers:      int(cmd.Uint(FlagMaxUsers)),
+		MinPasswdLen:  int(cmd.Uint(FlagMinPasswdLen)),
+		MaxPasswdLen:  int(cmd.Uint(FlagMaxPasswdLen)),
+	}
+
 	vault, err := secrets.NewDirVault(cmd.String(FlagSecretsPath))
 	if err != nil {
 		return nil, nil, err
@@ -119,7 +127,7 @@ func initApp(ctx context.Context, cmd *cli.Command) (*grpc.Server, *db.Store, er
 		return nil, nil, err
 	}
 
-	server, err := pb.Setup(ctx, store, vault)
+	server, err := pb.Setup(ctx, store, vault, globalConf)
 	if err != nil {
 		slog.ErrorContext(ctx, "Unable to setup gRPC server", logging.ErrKey, err)
 		return nil, nil, err

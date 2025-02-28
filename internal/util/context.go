@@ -9,3 +9,10 @@ const (
 	ProtoServerKey
 	CredentialsKey
 )
+
+type ConfigStore struct {
+	AllowNewUsers bool
+	MaxUsers      int
+	MinPasswdLen  int
+	MaxPasswdLen  int
+}

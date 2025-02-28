@@ -26,6 +26,8 @@ const (
 	FlagLogOutput        = "log-output"
 	FlagMaxUsers         = "max-users"
 	FlagSecretsPath      = "secrets-path"
+	FlagMinPasswdLen     = "min-password-length"
+	FlagMaxPasswdLen     = "max-password-length"
 )
 
 func flags() []cli.Flag {
@@ -100,6 +102,18 @@ func flags() []cli.Flag {
 			Name:    FlagDisablePubSignup,
 			Usage:   "Deactivate public (non admin-based) signups",
 			Sources: cli.EnvVars("DISABLE_PUBLIC_SIGNUP"),
+		},
+		&cli.UintFlag{ // Not validated, you're dumb if you set a value < MinPasswdLen
+			Name:    FlagMaxPasswdLen,
+			Usage:   "Maximum password length the server can accept",
+			Value:   144, // An OG tweet seems reasonable
+			Sources: cli.EnvVars("MAX_PASSWORD_LENGTH"),
+		},
+		&cli.UintFlag{
+			Name:    FlagMinPasswdLen,
+			Usage:   "Minimum password length the server can accept",
+			Value:   8,
+			Sources: cli.EnvVars("MIN_PASSWORD_LENGTH"),
 		}, // }}}
 	}
 }

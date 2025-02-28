@@ -25,6 +25,7 @@ const (
 	AssignTagToTask
 	UpdateSetting
 	GetUserRoles
+	GetUserCount
 )
 
 var commonTransactions = [...]struct {
@@ -119,5 +120,9 @@ var commonTransactions = [...]struct {
 	{ // Get all the roles assigned to a user
 		Name: GetUserRoles,
 		Cmd:  `SELECT role FROM UserRoles WHERE userID = ?`,
+	},
+	{ // Get how many users are signed up
+		Name: GetUserCount,
+		Cmd:  `SELECT COUNT(*) FROM Users`,
 	},
 }
