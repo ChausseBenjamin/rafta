@@ -22,19 +22,6 @@ const (
 	genPasswordLength = 24
 )
 
-// Characters used when generating a password
-var genPasswordChars = [...]byte{
-	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', // loswer
-	'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', // UPPER
-	'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // Int
-	' ', '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', // Specials
-	'[', ']', '{', '}', '<', '>', ',', '.', '/', ':',
-	'-', '=', '_', '+', '`', '~',
-	// ';', '"', '?', '\'', '\\', // risky or escaped characters
-}
-
 // GenerateHash generates a hash for the given secret using the Argon2id algorithm.
 // It returns the hash in the format "salt$hash", both base64 encoded.
 func GenerateHash(secret string) (string, error) {
@@ -90,14 +77,11 @@ func ValidateCreds(secret, stored string) error {
 func GenPassword() (string, string, error) {
 	psswd := make([]byte, genPasswordLength)
 	for i := range psswd {
-		index, err := rand.Int(
-			rand.Reader,
-			big.NewInt(int64(len(genPasswordChars))),
-		)
+		n, err := rand.Int(rand.Reader, big.NewInt(95))
 		if err != nil {
 			return "", "", err
 		}
-		psswd[i] = genPasswordChars[index.Int64()]
+		psswd[i] = byte(n.Int64() + 32)
 	}
 	hash, err := GenerateHash(string(psswd))
 	if err != nil {
