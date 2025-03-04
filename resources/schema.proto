@@ -154,5 +154,6 @@ service Admin {
 service Auth {
 	rpc Signup(UserCredsRequest) returns (SignupResponse);
   rpc Login(Credentials) returns (LoginResponse);
-  rpc Refresh(RefreshRequest) returns (JWT);
+	// No refresh token is already in the header, no need for an input
+  rpc Refresh(google.protobuf.Empty) returns (JWT);
 }

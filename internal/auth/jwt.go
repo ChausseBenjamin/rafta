@@ -21,9 +21,11 @@ import (
 
 const (
 	// TODO: Make these configurable through flags/env variables
+	issuer               = "rafta-server"
 	refreshTokenDuration = 24 * time.Hour
 	accessTokenDuration  = 20 * time.Minute
-	issuer               = "rafta-server"
+	accessTokenName      = "access"
+	refreshTokenName     = "refresh"
 )
 
 var (
@@ -41,6 +43,7 @@ type AuthManager struct {
 type claims struct {
 	UserID string   `json:"uuid"`
 	Roles  []string `json:"roles"`
+	Type   string   `json:"token_type"`
 	jwt.RegisteredClaims
 }
 
@@ -88,10 +91,11 @@ func (a *AuthManager) Issue(userID string, roles []string) (string, string, erro
 		return "", "", uuidErr
 	}
 
-	// Create the claims
-	claims := claims{
+	// Create the accessClaims
+	accessClaims := claims{
 		UserID: userID,
 		Roles:  roles,
+		Type:   accessTokenName,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    issuer,
 			Subject:   userID,
@@ -103,18 +107,23 @@ func (a *AuthManager) Issue(userID string, roles []string) (string, string, erro
 	}
 
 	// Create the access token
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims)
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodEdDSA, accessClaims)
 	accessTokenString, err := accessToken.SignedString(ed25519.PrivateKey(a.privKey))
 	if err != nil {
 		return "", "", fmt.Errorf("failed to sign access token: %v", err)
 	}
 
 	// Create the refresh token claims
-	refreshClaims := jwt.RegisteredClaims{
-		Subject:   userID,
-		ExpiresAt: jwt.NewNumericDate(now.Add(refreshTokenDuration)),
-		IssuedAt:  jwt.NewNumericDate(now),
-		ID:        refreshID,
+	refreshClaims := claims{
+		UserID: userID,
+		Roles:  roles,
+		Type:   refreshTokenName,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userID,
+			ExpiresAt: jwt.NewNumericDate(now.Add(refreshTokenDuration)),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ID:        refreshID,
+		},
 	}
 
 	// Create the refresh token
