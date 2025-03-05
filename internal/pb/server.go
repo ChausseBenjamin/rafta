@@ -16,7 +16,7 @@ import (
 
 var ErrOutOfBoundsPort = errors.New("given port is out of bounds (1024-65535)")
 
-type UserServer struct {
+type RaftaServer struct {
 	store *db.Store
 	cfg   *util.ConfigStore
 	m.UnimplementedRaftaServer
@@ -35,8 +35,8 @@ type AuthServer struct {
 	m.UnimplementedAuthServer
 }
 
-func NewRaftaServer(store *db.Store, cfg *util.ConfigStore) *UserServer {
-	return &UserServer{store: store, cfg: cfg}
+func NewRaftaServer(store *db.Store, cfg *util.ConfigStore) *RaftaServer {
+	return &RaftaServer{store: store, cfg: cfg}
 }
 
 func NewAdminServer(store *db.Store, cfg *util.ConfigStore) *AdminServer {

@@ -13,7 +13,7 @@ func (s *UserServer) GetTask(ctx context.Context, id *m.UUID) (*m.Task, error) {
 	return nil, nil
 }
 
-func (s *UserServer) GetUserInfo(ctx context.Context, _ *emptypb.Empty) (*m.User, error) {
+func (s *RaftaServer) GetUserInfo(ctx context.Context, _ *emptypb.Empty) (*m.User, error) {
 	ctx = context.WithValue(ctx, util.ProtoMethodKey, "GetUserInfo")
 	return nil, nil
 }

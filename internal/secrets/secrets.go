@@ -22,6 +22,10 @@ func (s Secret) String() string {
 	return string(s)
 }
 
+func (s Secret) Bytes() []byte {
+	return []byte(s)
+}
+
 func (s Secret) LogValue() slog.Value {
 	return slog.StringValue("REDACTED")
 }

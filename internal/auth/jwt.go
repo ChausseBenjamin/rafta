@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/ChausseBenjamin/rafta/internal/secrets"
@@ -14,7 +15,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/hashicorp/go-uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 var ErrTokenAlg = errors.New("Received token uses an unsupported signing method")
@@ -47,11 +50,6 @@ type claims struct {
 	jwt.RegisteredClaims
 }
 
-type credentials struct {
-	UserID string
-	Roles  []string
-}
-
 // Authenticating returns an interceptor that retrieves a jwt from the header
 // then passes it to the Validate function. If Validate returns no error,
 // the credentials are added to the context with the util.CredentialsKey
@@ -59,33 +57,31 @@ func (a *AuthManager) Authenticating() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
-			return handler(ctx, req)
+			return nil, status.Errorf(codes.Unauthenticated, "missing metadata")
 		}
 
 		tokenMetadata := md["authorization"]
 		if len(tokenMetadata) == 0 {
+			// service doesn't return an error since some services don't need auth
+			// the services that do just won't be able to find credentials and revoke
 			return handler(ctx, req)
 		}
-		token, err := jwt.Parse(tokenMetadata[0], func(token *jwt.Token) (any, error) {
+		tokenStr := strings.TrimPrefix(tokenMetadata[0], "Bearer ")
+
+		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodEd25519); !ok {
 				slog.InfoContext(ctx, "Received token uses an unsupported signing method", "algorithm", token.Header["alg"])
 				return nil, ErrTokenAlg
 			}
-			return a.privKey, nil
+			return ed25519.PublicKey(a.pubKey.Bytes()), nil
 		})
 		if err != nil {
-			return handler(ctx, req)
+			return nil, status.Errorf(codes.Unauthenticated, "invalid token: %v", err)
 		}
 
 		newCtx := context.WithValue(ctx, util.CredentialsKey, token)
 		return handler(newCtx, req)
 	}
-}
-
-func (a *AuthManager) Validate(token string) (credentials, error) {
-	// TODO: Implement validation
-	slog.Error("TOKEN VALIDATION IS NOT IMPLEMENTED YET...")
-	return credentials{}, nil
 }
 
 func (a *AuthManager) Issue(userID string, roles []string) (string, string, error) {
