@@ -12,6 +12,7 @@ import (
 	"github.com/ChausseBenjamin/rafta/internal/util"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 var ErrOutOfBoundsPort = errors.New("given port is out of bounds (1024-65535)")
@@ -61,6 +62,7 @@ func Setup(ctx context.Context, store *db.Store, vault secrets.SecretVault, cfg 
 		authMgr.Authenticating(),
 	))
 
+	reflection.Register(server)
 	m.RegisterAuthServer(server, NewAuthServer(store, authMgr, cfg))
 	m.RegisterAdminServer(server, NewAdminServer(store, cfg))
 	m.RegisterRaftaServer(server, NewRaftaServer(store, cfg))
