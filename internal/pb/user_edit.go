@@ -18,7 +18,7 @@ func (s *RaftaServer) UpdateUserInfo(ctx context.Context, val *m.User) (*emptypb
 	return nil, nil
 }
 
-func (s *RaftaServer) DeleteUser(ctx context.Context, val *emptypb.Empty) (*emptypb.Empty, error) {
+func (s *RaftaServer) DeleteUser(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
 	ctx = context.WithValue(ctx, util.ProtoMethodKey, "DeleteUser")
 	return nil, nil
 }

@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/ChausseBenjamin/rafta/internal/secrets"
 	"golang.org/x/crypto/argon2"
 )
 
@@ -23,6 +24,11 @@ const (
 )
 
 var threads uint8 = uint8(runtime.NumCPU())
+
+type Credentials struct {
+	Email  string
+	Secret secrets.Secret
+}
 
 // GenerateHash generates a hash for the given secret using the Argon2id algorithm.
 // It returns the hash in the format "salt$hash", both base64 encoded.

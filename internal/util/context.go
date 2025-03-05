@@ -3,8 +3,6 @@ package util
 import (
 	"context"
 	"log/slog"
-
-	"github.com/golang-jwt/jwt/v5"
 )
 
 type ContextKey uint8
@@ -14,7 +12,8 @@ const (
 	ReqIDKey
 	ProtoMethodKey
 	ProtoServerKey
-	CredentialsKey
+	JwtKey         // Generated from Bearer tokens
+	CredentialsKey // Generated from Basic tokens
 )
 
 type ConfigStore struct {
@@ -24,12 +23,12 @@ type ConfigStore struct {
 	MaxPasswdLen  int
 }
 
-func GetToken(ctx context.Context) *jwt.Token {
-	if value := ctx.Value(CredentialsKey); value != nil {
-		if token, ok := value.(*jwt.Token); ok {
-			return token
+func GetFromContext[T any](ctx context.Context, key any) *T {
+	if value := ctx.Value(key); value != nil {
+		if asserted, ok := value.(*T); ok {
+			return asserted
 		}
 	}
-	slog.WarnContext(ctx, "Failed to retrieve JWT from context")
+	slog.WarnContext(ctx, "Failed to retrieve item from context", "key", key)
 	return nil
 }

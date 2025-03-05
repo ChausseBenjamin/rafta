@@ -153,7 +153,9 @@ service Admin {
 // Used only for signups and logins before a jwt is issued
 service Auth {
 	rpc Signup(UserCredsRequest) returns (SignupResponse);
-  rpc Login(Credentials) returns (LoginResponse);
+	// Login uses a Basic token in the header
+	// (`Authorization: Basic <base64>clientID:clientSecret</base64>`)
+  rpc Login(google.protobuf.Empty) returns (LoginResponse);
 	// No refresh token is already in the header, no need for an input
   rpc Refresh(google.protobuf.Empty) returns (JWT);
 }

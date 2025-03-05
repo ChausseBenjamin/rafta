@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"database/sql"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -20,18 +21,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var ErrTokenAlg = errors.New("Received token uses an unsupported signing method")
-
 const (
 	// TODO: Make these configurable through flags/env variables
 	issuer               = "rafta-server"
 	refreshTokenDuration = 24 * time.Hour
-	accessTokenDuration  = 20 * time.Hour
+	accessTokenDuration  = 20 * time.Hour // for ease of testing
 	accessTokenName      = "access"
 	refreshTokenName     = "refresh"
 )
 
 var (
+	errTokenAlg     = errors.New("Received token uses an unsupported signing method")
 	privKeyStoreErr = errors.New("failed to store private key in vault")
 	pubKeyStoreErr  = errors.New("failed to store public key in vault")
 	uuidErr         = errors.New("Failed to generate a UUID for a token")
@@ -62,25 +62,50 @@ func (a *AuthManager) Authenticating() grpc.UnaryServerInterceptor {
 
 		tokenMetadata := md["authorization"]
 		if len(tokenMetadata) == 0 {
-			// service doesn't return an error since some services don't need auth
-			// the services that do just won't be able to find credentials and revoke
 			return handler(ctx, req)
 		}
-		tokenStr := strings.TrimPrefix(tokenMetadata[0], "Bearer ")
 
-		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodEd25519); !ok {
-				slog.InfoContext(ctx, "Received token uses an unsupported signing method", "algorithm", token.Header["alg"])
-				return nil, ErrTokenAlg
+		authHeader := tokenMetadata[0]
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+
+			token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodEd25519); !ok {
+					slog.InfoContext(ctx, "Received token uses an unsupported signing method", "algorithm", token.Header["alg"])
+					return nil, errTokenAlg
+				}
+				return ed25519.PublicKey(a.pubKey.Bytes()), nil
+			})
+			if err != nil {
+				return nil, status.Errorf(codes.Unauthenticated, "invalid token: %v", err)
 			}
-			return ed25519.PublicKey(a.pubKey.Bytes()), nil
-		})
-		if err != nil {
-			return nil, status.Errorf(codes.Unauthenticated, "invalid token: %v", err)
+
+			newCtx := context.WithValue(ctx, util.JwtKey, token)
+			return handler(newCtx, req)
+		} else if strings.HasPrefix(authHeader, "Basic ") {
+			encodedCreds := strings.TrimPrefix(authHeader, "Basic ")
+			decodedCreds, err := base64.StdEncoding.DecodeString(encodedCreds)
+			// In case a client f*cks up base64 encode:
+			decodedStr := strings.TrimSpace(string(decodedCreds))
+			if err != nil {
+				return nil, status.Errorf(codes.Unauthenticated, "invalid basic auth encoding: %v", err)
+			}
+
+			credsParts := strings.SplitN(string(decodedStr), ":", 2)
+			if len(credsParts) != 2 {
+				return nil, status.Errorf(codes.Unauthenticated, "invalid basic auth format")
+			}
+
+			creds := &Credentials{
+				Email:  credsParts[0],
+				Secret: secrets.Secret(credsParts[1]),
+			}
+
+			newCtx := context.WithValue(ctx, util.CredentialsKey, creds)
+			return handler(newCtx, req)
 		}
 
-		newCtx := context.WithValue(ctx, util.CredentialsKey, token)
-		return handler(newCtx, req)
+		return nil, status.Errorf(codes.Unauthenticated, "unsupported authorization method")
 	}
 }
 

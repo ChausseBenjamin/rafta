@@ -12,14 +12,16 @@ import (
 	"github.com/ChausseBenjamin/rafta/internal/auth"
 	"github.com/ChausseBenjamin/rafta/internal/db"
 	"github.com/ChausseBenjamin/rafta/internal/logging"
+	"github.com/ChausseBenjamin/rafta/internal/util"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
 	"github.com/hashicorp/go-uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func (s *AuthServer) Login(ctx context.Context, creds *m.Credentials) (*m.LoginResponse, error) {
+func (s *AuthServer) Login(ctx context.Context, _ *emptypb.Empty) (*m.LoginResponse, error) {
 	var (
 		name    string
 		uuid    string
@@ -27,6 +29,8 @@ func (s *AuthServer) Login(ctx context.Context, creds *m.Credentials) (*m.LoginR
 		updated time.Time
 		hash    string
 	)
+
+	creds := util.GetFromContext[auth.Credentials](ctx, util.CredentialsKey)
 
 	stmt := s.store.Common[db.GetSingleUserWithSecret]
 	row := stmt.QueryRowContext(ctx, creds.Email)
@@ -44,7 +48,7 @@ func (s *AuthServer) Login(ctx context.Context, creds *m.Credentials) (*m.LoginR
 		}
 	}
 
-	if err := auth.ValidateCreds(creds.Secret, hash); err != nil {
+	if err := auth.ValidateCreds(creds.Secret.String(), hash); err != nil {
 		slog.InfoContext(ctx,
 			"Failed login attempt, invalid credentials",
 			logging.ErrKey, err,
@@ -191,4 +195,12 @@ func (s *AuthServer) Signup(ctx context.Context, info *m.UserCredsRequest) (*m.S
 	}, nil
 }
 
-// TODO: Refresh(context.Context, *RefreshRequest) (*JWT, error)
+//
+// func (s *AuthServer) Refresh(ctx context.Context, _ *emptypb.Empty) (*m.JWT, error) {
+// 	token := util.GetToken(ctx)
+// 	if token == nil {
+// 		return nil, status.Errorf(codes.FailedPrecondition,
+// 			"No valid refresh token found in header when processing request",
+// 		)
+// 	}
+// }
