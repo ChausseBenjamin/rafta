@@ -14,16 +14,16 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/hashicorp/go-uuid"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
 )
+
+var ErrTokenAlg = errors.New("Received token uses an unsupported signing method")
 
 const (
 	// TODO: Make these configurable through flags/env variables
 	issuer               = "rafta-server"
 	refreshTokenDuration = 24 * time.Hour
-	accessTokenDuration  = 20 * time.Minute
+	accessTokenDuration  = 20 * time.Hour
 	accessTokenName      = "access"
 	refreshTokenName     = "refresh"
 )
@@ -62,17 +62,22 @@ func (a *AuthManager) Authenticating() grpc.UnaryServerInterceptor {
 			return handler(ctx, req)
 		}
 
-		token := md["authorization"]
-		if len(token) == 0 {
+		tokenMetadata := md["authorization"]
+		if len(tokenMetadata) == 0 {
+			return handler(ctx, req)
+		}
+		token, err := jwt.Parse(tokenMetadata[0], func(token *jwt.Token) (any, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodEd25519); !ok {
+				slog.InfoContext(ctx, "Received token uses an unsupported signing method", "algorithm", token.Header["alg"])
+				return nil, ErrTokenAlg
+			}
+			return a.privKey, nil
+		})
+		if err != nil {
 			return handler(ctx, req)
 		}
 
-		creds, err := a.Validate(token[0])
-		if err != nil {
-			return nil, status.Errorf(codes.Unauthenticated, "invalid token: %v", err)
-		}
-
-		newCtx := context.WithValue(ctx, util.CredentialsKey, creds)
+		newCtx := context.WithValue(ctx, util.CredentialsKey, token)
 		return handler(newCtx, req)
 	}
 }

@@ -1,5 +1,6 @@
 build/
-runtime/
+.runtime/
+.secrets/
 docker-compose.yml
 rafta
 store.db
