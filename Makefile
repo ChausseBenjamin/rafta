@@ -16,6 +16,15 @@ codegen:
 		--go-grpc_opt=paths=source_relative \
 		resources/schema.proto
 
+protoset:
+	mkdir -p $(BUILD_DIR)/protoset
+	protoc \
+		--proto_path=resources \
+		--proto_path=external \
+		--descriptor_set_out=$(BUILD_DIR)/protoset/schema.protoset \
+		--include_imports \
+		resources/schema.proto
+
 clean:
 	rm -rf $(BUILD_DIR) || exit 1
 
