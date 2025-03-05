@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"math/big"
+	"runtime"
 	"strings"
 
 	"golang.org/x/crypto/argon2"
@@ -15,12 +16,13 @@ import (
 const (
 	ArgonTime      = 1         // Iterations
 	ArgonMemory    = 64 * 1024 // 64 MiB
-	ArgonParallel  = 4         // Threads
 	ArgonKeyLength = 32        // Output hash size
 	ArgonSaltSize  = 16        // Salt size (bytes)
 
 	genPasswordLength = 24
 )
+
+var threads uint8 = uint8(runtime.NumCPU())
 
 // GenerateHash generates a hash for the given secret using the Argon2id algorithm.
 // It returns the hash in the format "salt$hash", both base64 encoded.
@@ -30,7 +32,7 @@ func GenerateHash(secret string) (string, error) {
 		return "", err
 	}
 
-	hash := argon2.IDKey([]byte(secret), salt, ArgonTime, ArgonMemory, ArgonParallel, ArgonKeyLength)
+	hash := argon2.IDKey([]byte(secret), salt, ArgonTime, ArgonMemory, threads, ArgonKeyLength)
 
 	return strings.Join([]string{
 		base64.StdEncoding.EncodeToString(salt),
@@ -57,7 +59,7 @@ func ValidateCreds(secret, stored string) error {
 		return errors.New("invalid hash encoding")
 	}
 
-	computedHash := argon2.IDKey([]byte(secret), salt, ArgonTime, ArgonMemory, ArgonParallel, ArgonKeyLength)
+	computedHash := argon2.IDKey([]byte(secret), salt, ArgonTime, ArgonMemory, threads, ArgonKeyLength)
 
 	// Constant-time comparison
 	if len(computedHash) != len(expectedHash) {
