@@ -162,17 +162,6 @@ func (a *AuthManager) Issue(userID string, roles []string) (string, string, erro
 	return accessTokenString, refreshTokenString, nil
 }
 
-// Renew
-func (a *AuthManager) Renew(token jwt.Token) {
-	slog.Error("TOKEN VALIDATION IS NOT IMPLEMENTED YET...")
-}
-
-// Revoke adds a tokens uuid to the database and start a goroutine to clean it
-// up once it expires.
-func (a *AuthManager) Revoke(uuid string) {
-	panic("unimplemented")
-}
-
 func NewManager(vault secrets.SecretVault, db *sql.DB) (*AuthManager, error) {
 	pubkey, pubErr := vault.Get("server-pubkey")
 	privkey, privErr := vault.Get("server-privkey")

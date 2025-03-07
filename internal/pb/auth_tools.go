@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ChausseBenjamin/rafta/internal/db"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func (s *AuthServer) getUserRoles(ctx context.Context, userID string) ([]string, error) {
@@ -32,5 +33,6 @@ func (s *AuthServer) getUserRoles(ctx context.Context, userID string) ([]string,
 
 // validateEmail ensure a given string is a valid email
 func (s *AuthServer) validateEmail(email string) bool {
+func revokeTokens(tokens []jwt.Token) {
 	panic("unimplemented")
 }
