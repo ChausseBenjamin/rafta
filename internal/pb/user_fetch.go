@@ -8,7 +8,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-func (s *UserServer) GetTask(ctx context.Context, id *m.UUID) (*m.Task, error) {
+func (s *RaftaServer) GetTask(ctx context.Context, id *m.UUID) (*m.Task, error) {
 	ctx = context.WithValue(ctx, util.ProtoMethodKey, "GetTask")
 	return nil, nil
 }

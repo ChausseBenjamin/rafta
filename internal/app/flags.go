@@ -74,7 +74,7 @@ func flags() []cli.Flag {
 		&cli.DurationFlag{
 			Name:    FlagGraceTimeout,
 			Aliases: []string{"t"},
-			Value:   5 * time.Second,
+			Value:   3 * time.Second,
 			Sources: cli.EnvVars("GRACEFUL_TIMEOUT"),
 		}, // }}}
 		// Database {{{
