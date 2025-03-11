@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ChausseBenjamin/rafta/internal/logging"
 	"github.com/ChausseBenjamin/rafta/internal/secrets"
 	"github.com/ChausseBenjamin/rafta/internal/util"
 	"github.com/golang-jwt/jwt/v5"
@@ -38,9 +39,10 @@ var (
 )
 
 type AuthManager struct {
-	pubKey  secrets.Secret
-	privKey secrets.Secret
-	db      *sql.DB
+	pubKey      secrets.Secret
+	privKey     secrets.Secret
+	db          *sql.DB
+	revokeCheck *sql.Stmt
 }
 
 type Claims struct {
@@ -66,56 +68,81 @@ func (a *AuthManager) Authenticating() grpc.UnaryServerInterceptor {
 		}
 
 		authHeader := tokenMetadata[0]
-		if strings.HasPrefix(authHeader, "Bearer ") {
-			tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		switch strings.ToLower(strings.Split(tokenMetadata[0], " ")[0]) {
+		case "bearer":
+			return a.handleBearerAuth(ctx, req, handler, authHeader)
+		case "basic":
+			return a.handleBasicAuth(ctx, req, handler, authHeader)
+		default:
+			return nil, status.Errorf(codes.Unauthenticated, "unsupported authorization method")
+		}
+	}
+}
 
-			token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(token *jwt.Token) (any, error) {
-				if _, ok := token.Method.(*jwt.SigningMethodEd25519); !ok {
-					slog.InfoContext(ctx, "Received token uses an unsupported signing method", "algorithm", token.Header["alg"])
-					return nil, errTokenAlg
-				}
-				return ed25519.PublicKey(a.pubKey.Bytes()), nil
-			})
-			if err != nil {
-				return nil, status.Errorf(codes.Unauthenticated, "invalid token: %v", err)
-			}
+func (a *AuthManager) handleBasicAuth(ctx context.Context, req any, handler grpc.UnaryHandler, authHeader string) (any, error) {
+	encodedCreds := strings.TrimPrefix(authHeader, "Basic ")
+	decodedCreds, err := base64.StdEncoding.DecodeString(encodedCreds)
+	decodedStr := strings.TrimSpace(string(decodedCreds))
+	if err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "invalid basic auth encoding: %v", err)
+	}
 
-			if tokenWithClaims, ok := token.Claims.(*Claims); !ok {
-				slog.Warn("Unable to extract custom claims from JWT")
-				return handler(ctx, req)
-			} else {
-				return handler(context.WithValue(ctx, util.JwtKey, tokenWithClaims), req)
-			}
+	credsParts := strings.SplitN(decodedStr, ":", 2)
+	if len(credsParts) != 2 {
+		return nil, status.Errorf(codes.Unauthenticated, "invalid basic auth format")
+	}
 
-		} else if strings.HasPrefix(authHeader, "Basic ") {
-			encodedCreds := strings.TrimPrefix(authHeader, "Basic ")
-			decodedCreds, err := base64.StdEncoding.DecodeString(encodedCreds)
-			// In case a client f*cks up base64 encode:
-			decodedStr := strings.TrimSpace(string(decodedCreds))
-			if err != nil {
-				return nil, status.Errorf(codes.Unauthenticated, "invalid basic auth encoding: %v", err)
-			}
+	creds := &Credentials{
+		Email:  credsParts[0],
+		Secret: secrets.Secret(credsParts[1]),
+	}
 
-			credsParts := strings.SplitN(string(decodedStr), ":", 2)
-			if len(credsParts) != 2 {
-				return nil, status.Errorf(codes.Unauthenticated, "invalid basic auth format")
-			}
+	newCtx := context.WithValue(ctx, util.CredentialsKey, creds)
+	return handler(newCtx, req)
+}
 
-			creds := &Credentials{
-				Email:  credsParts[0],
-				Secret: secrets.Secret(credsParts[1]),
-			}
+func (a *AuthManager) handleBearerAuth(ctx context.Context, req any, handler grpc.UnaryHandler, authHeader string) (any, error) {
+	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 
-			newCtx := context.WithValue(ctx, util.CredentialsKey, creds)
-			return handler(newCtx, req)
+	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(token *jwt.Token) (any, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodEd25519); !ok {
+			slog.InfoContext(ctx, "Received token uses an unsupported signing method", "algorithm", token.Header["alg"])
+			return nil, errTokenAlg
+		}
+		return ed25519.PublicKey(a.pubKey.Bytes()), nil
+	})
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, err.Error())
+	}
+
+	if tokenWithClaims, ok := token.Claims.(*Claims); !ok {
+		slog.Warn("Unable to extract custom claims from JWT")
+		return handler(ctx, req)
+	} else {
+		revoked := false
+		row := a.revokeCheck.QueryRowContext(ctx, tokenWithClaims.ID)
+		err := row.Scan(&revoked)
+		if err != nil {
+			slog.Error("failed to ensure provided token is not revoked",
+				logging.ErrKey, err,
+			)
+			return nil, status.Error(
+				codes.Internal,
+				"failure while ensuring token isn't revoked",
+			)
+		}
+		if revoked {
+			return nil, status.Error(codes.Unauthenticated,
+				"provided token has been revoked",
+			)
 		}
 
-		return nil, status.Errorf(codes.Unauthenticated, "unsupported authorization method")
+		return handler(context.WithValue(ctx, util.JwtKey, tokenWithClaims), req)
 	}
 }
 
 func (a *AuthManager) Issue(userID string, roles []string) (string, string, error) {
-	now := time.Now()
+	now := time.Now().UTC()
 	accessID, accessIDErr := uuid.GenerateUUID()
 	refreshID, refreshIDErr := uuid.GenerateUUID()
 	if accessIDErr != nil || refreshIDErr != nil {
@@ -188,9 +215,31 @@ func NewManager(vault secrets.SecretVault, db *sql.DB) (*AuthManager, error) {
 		pubkey = secrets.Secret(publicKey)
 		privkey = secrets.Secret(privateKey)
 	}
+
+	// The validation check is not set in the db package to avoid circular
+	// dependencies. This should be the only one though
+	stmt, err := db.Prepare(
+		"SELECT EXISTS(SELECT 1 FROM RevokedTokens WHERE tokenID = ?)",
+	)
+	if err != nil {
+		slog.Error("Failed to prepare revocation check query for JWT",
+			logging.ErrKey, err,
+		)
+	}
+
 	return &AuthManager{
-		db:      db,
-		pubKey:  pubkey,
-		privKey: privkey,
+		db:          db,
+		pubKey:      pubkey,
+		privKey:     privkey,
+		revokeCheck: stmt,
 	}, nil
+}
+
+func (a *AuthManager) Close() {
+	err := a.revokeCheck.Close()
+	if err != nil {
+		slog.Error("Failure closing the token revocation check query for JWT",
+			logging.ErrKey, err,
+		)
+	}
 }

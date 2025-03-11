@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ChausseBenjamin/rafta/internal/auth"
 	"github.com/ChausseBenjamin/rafta/internal/db"
 	"github.com/ChausseBenjamin/rafta/internal/logging"
 	"github.com/ChausseBenjamin/rafta/internal/pb"
@@ -41,7 +42,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	brutalShutdown := func() {}
 
 	application := func() {
-		server, store, err := initApp(ctx, cmd)
+		server, store, authMgr, err := initApp(ctx, cmd)
 		if err != nil {
 			errAppChan <- err
 			return
@@ -51,6 +52,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			once.Do(func() { // Ensure brutal shutdown isn't triggered later
 				server.GracefulStop()
 				store.Close()
+				authMgr.Close()
 				slog.InfoContext(ctx, "Application shutdown")
 				close(shutdownDone) // Signal that graceful shutdown is complete
 			})
@@ -62,6 +64,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			)
 			server.Stop()
 			store.Close()
+			authMgr.Close()
 		}
 
 		port := fmt.Sprintf(":%d", cmd.Int(FlagListenPort))
@@ -108,7 +111,7 @@ func waitForTermChan() chan os.Signal {
 	return stopChan
 }
 
-func initApp(ctx context.Context, cmd *cli.Command) (*grpc.Server, *db.Store, error) {
+func initApp(ctx context.Context, cmd *cli.Command) (*grpc.Server, *db.Store, *auth.AuthManager, error) {
 	globalConf := &util.ConfigStore{
 		AllowNewUsers: !cmd.Bool(FlagDisablePubSignup),
 		MaxUsers:      int(cmd.Uint(FlagMaxUsers)),
@@ -118,20 +121,20 @@ func initApp(ctx context.Context, cmd *cli.Command) (*grpc.Server, *db.Store, er
 
 	vault, err := secrets.NewDirVault(cmd.String(FlagSecretsPath))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	store, err := db.Setup(ctx, cmd.String(FlagDBPath))
 	if err != nil {
 		slog.ErrorContext(ctx, "Unable to setup database", logging.ErrKey, err)
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	server, err := pb.Setup(ctx, store, vault, globalConf)
+	server, authMgr, err := pb.Setup(ctx, store, vault, globalConf)
 	if err != nil {
 		slog.ErrorContext(ctx, "Unable to setup gRPC server", logging.ErrKey, err)
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return server, store, nil
+	return server, store, authMgr, nil
 }

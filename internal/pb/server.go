@@ -50,10 +50,10 @@ func NewAuthServer(store *db.Store, authMgr *auth.AuthManager, cfg *util.ConfigS
 
 // Setup creates a new gRPC with both services
 // and starts listening on the given port
-func Setup(ctx context.Context, store *db.Store, vault secrets.SecretVault, cfg *util.ConfigStore) (*grpc.Server, error) {
+func Setup(ctx context.Context, store *db.Store, vault secrets.SecretVault, cfg *util.ConfigStore) (*grpc.Server, *auth.AuthManager, error) {
 	authMgr, err := auth.NewManager(vault, store.DB)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	slog.DebugContext(ctx, "Configuring gRPC server")
@@ -67,5 +67,5 @@ func Setup(ctx context.Context, store *db.Store, vault secrets.SecretVault, cfg 
 	m.RegisterAdminServer(server, NewAdminServer(store, cfg))
 	m.RegisterRaftaServer(server, NewRaftaServer(store, cfg))
 
-	return server, nil
+	return server, authMgr, nil
 }
