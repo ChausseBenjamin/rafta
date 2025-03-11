@@ -85,14 +85,14 @@ try and develop a client in Neovim as well as a mobile client.
 
 ## Roadmap
 
-- [X] Protobuf schema definition
 - [X] Blank Database Initialization
-- [X] Request-ID tracking middleware
 - [X] Logging framework (request-ID, stack traces, optional Json)
+- [X] Protobuf schema definition
+- [X] Request-ID tracking middleware
+- [X] User Authentication (probably jwt)
 - [ ] **Actual Server Logic**
-- [ ] Task re-scheduling routine
-- [ ] User Authentication (probably jwt)
 - [ ] Neovim plugin client
+- [ ] Task re-scheduling routine
 
 
 
