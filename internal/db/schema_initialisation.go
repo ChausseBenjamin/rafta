@@ -62,7 +62,7 @@ var schemaDefinitions = [...]struct {
 		);`,
 	},
 	{
-		"RevokedTokens", // jwt token blacklist
+		"RevokedTokens", // jwt token blacklist, expiration needed for cleanup/garbage collection
 		`CREATE TABLE RevokedTokens (
 			tokenID TEXT PRIMARY KEY,
 			expiration TIMESTAMP

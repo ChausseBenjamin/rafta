@@ -69,4 +69,8 @@ var commonTransactions = [...]struct {
 		Name: GetUserRoles,
 		Cmd:  `SELECT role FROM UserRoles WHERE userID = ?`,
 	},
+	{ // Add a jwt token to the list of revoked tokens
+		Name: RevokeToken,
+		Cmd:  `INSERT INTO RevokedTokens (tokenID, expiration) VALUES (?, ?)`,
+	},
 }

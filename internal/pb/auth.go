@@ -195,12 +195,42 @@ func (s *AuthServer) Signup(ctx context.Context, info *m.UserCredsRequest) (*m.S
 	}, nil
 }
 
-//
-// func (s *AuthServer) Refresh(ctx context.Context, _ *emptypb.Empty) (*m.JWT, error) {
-// 	token := util.GetToken(ctx)
-// 	if token == nil {
-// 		return nil, status.Errorf(codes.FailedPrecondition,
-// 			"No valid refresh token found in header when processing request",
-// 		)
-// 	}
-// }
+func (a *AuthServer) Refresh(ctx context.Context, _ *emptypb.Empty) (*m.JWT, error) {
+	claims := util.GetFromContext[auth.Claims](ctx, util.JwtKey)
+	if claims == nil {
+		slog.ErrorContext(ctx,
+			"Reached the Refresh endpoint without a valid token",
+		)
+		return nil, status.Error(codes.Internal, "Reached the Refresh endpoint without a valid token")
+	}
+
+	if t := claims.Type; t != "refresh" {
+		slog.WarnContext(ctx, "Client attempt to refresh with a non-refresh token", "provided", t)
+	}
+
+	// Ensure the refresh token cannot be reused twice by blacklisting it
+	stmt := a.store.Common[db.RevokeToken]
+	_, err := stmt.ExecContext(ctx, claims.ID, claims.ExpiresAt.Time.UTC())
+	if err != nil {
+		slog.ErrorContext(ctx,
+			"Failed to enforce single-use of the refresh token",
+			logging.ErrKey, err,
+		)
+		return nil, status.Error(codes.Internal,
+			"Failure to enforce single-use policy for refresh token.",
+		)
+	}
+
+	access, refresh, err := a.authMgr.Issue(claims.UserID, claims.Roles)
+	if err != nil {
+		slog.ErrorContext(ctx,
+			"Failed to issue new JWT token pair (access+refresh).",
+		)
+		return nil, status.Error(codes.Internal, "JWT token generation failed")
+	}
+
+	return &m.JWT{
+		Access:  access,
+		Refresh: refresh,
+	}, nil
+}
