@@ -31,8 +31,6 @@ func (s *AuthServer) getUserRoles(ctx context.Context, userID string) ([]string,
 	return roles, nil
 }
 
-// validateEmail ensure a given string is a valid email
-func (s *AuthServer) validateEmail(email string) bool {
 func revokeTokens(tokens []jwt.Token) {
 	panic("unimplemented")
 }

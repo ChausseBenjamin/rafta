@@ -43,16 +43,16 @@ type AuthManager struct {
 	db      *sql.DB
 }
 
-type claims struct {
+type Claims struct {
 	UserID string   `json:"uuid"`
 	Roles  []string `json:"roles"`
 	Type   string   `json:"token_type"`
 	jwt.RegisteredClaims
 }
 
-// Authenticating returns an interceptor that retrieves a jwt from the header
-// then passes it to the Validate function. If Validate returns no error,
-// the credentials are added to the context with the util.CredentialsKey
+// Authenticating returns an interceptor that retrieves a jwt from the header.
+// It must insert an object where the UserID and his roles are available down
+// the line to other services.
 func (a *AuthManager) Authenticating() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
 		md, ok := metadata.FromIncomingContext(ctx)
@@ -69,7 +69,7 @@ func (a *AuthManager) Authenticating() grpc.UnaryServerInterceptor {
 		if strings.HasPrefix(authHeader, "Bearer ") {
 			tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 
-			token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) {
+			token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(token *jwt.Token) (any, error) {
 				if _, ok := token.Method.(*jwt.SigningMethodEd25519); !ok {
 					slog.InfoContext(ctx, "Received token uses an unsupported signing method", "algorithm", token.Header["alg"])
 					return nil, errTokenAlg
@@ -80,8 +80,13 @@ func (a *AuthManager) Authenticating() grpc.UnaryServerInterceptor {
 				return nil, status.Errorf(codes.Unauthenticated, "invalid token: %v", err)
 			}
 
-			newCtx := context.WithValue(ctx, util.JwtKey, token)
-			return handler(newCtx, req)
+			if tokenWithClaims, ok := token.Claims.(*Claims); !ok {
+				slog.Warn("Unable to extract custom claims from JWT")
+				return handler(ctx, req)
+			} else {
+				return handler(context.WithValue(ctx, util.JwtKey, tokenWithClaims), req)
+			}
+
 		} else if strings.HasPrefix(authHeader, "Basic ") {
 			encodedCreds := strings.TrimPrefix(authHeader, "Basic ")
 			decodedCreds, err := base64.StdEncoding.DecodeString(encodedCreds)
@@ -118,7 +123,7 @@ func (a *AuthManager) Issue(userID string, roles []string) (string, string, erro
 	}
 
 	// Create the accessClaims
-	accessClaims := claims{
+	accessClaims := Claims{
 		UserID: userID,
 		Roles:  roles,
 		Type:   accessTokenName,
@@ -140,7 +145,7 @@ func (a *AuthManager) Issue(userID string, roles []string) (string, string, erro
 	}
 
 	// Create the refresh token claims
-	refreshClaims := claims{
+	refreshClaims := Claims{
 		UserID: userID,
 		Roles:  roles,
 		Type:   refreshTokenName,
