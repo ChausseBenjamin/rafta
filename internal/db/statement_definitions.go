@@ -2,12 +2,12 @@ package db
 
 const RespMsgKey = "database_response"
 
-type transactionName int
+type statementName int
 
 // XXX: Make sure iota length is always the same as commonTransactions
 // WILL lead to an "index out of range" otherwise!
 const (
-	CreateUser transactionName = iota
+	CreateUser statementName = iota
 	CreateUserSecret
 	DeleteUser
 	GetAllUsers
@@ -31,8 +31,8 @@ const (
 // UpdateSetting
 )
 
-var commonTransactions = [...]struct {
-	Name transactionName
+var commonStatements = [...]struct {
+	Name statementName
 	Cmd  string
 }{
 	{ // Create a user (including salted secret)

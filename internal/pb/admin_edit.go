@@ -20,7 +20,7 @@ func (s *AdminServer) DeleteUser(ctx context.Context, id *m.UUID) (*emptypb.Empt
 	if !hasRequiredRole(creds.Roles, allowedAdminRoles) {
 		return nil, status.Error(
 			codes.PermissionDenied,
-			"User does not have the authority to query all users",
+			"User does not have the authority to delete another users",
 		)
 	}
 
@@ -43,6 +43,16 @@ func (s *AdminServer) DeleteUser(ctx context.Context, id *m.UUID) (*emptypb.Empt
 }
 
 func (s *AdminServer) UpdateUser(ctx context.Context, val *m.User) (*emptypb.Empty, error) {
-	slog.InfoContext(ctx, "Received admin request to update user")
-	return nil, nil
+	creds, err := getCreds(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !hasRequiredRole(creds.Roles, allowedAdminRoles) {
+		return nil, status.Error(
+			codes.PermissionDenied,
+			"User does not have the authority to update another users",
+		)
+	}
+
+	return nil, status.Error(codes.Unimplemented, "Still under construction")
 }
