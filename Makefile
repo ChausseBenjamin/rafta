@@ -21,7 +21,7 @@ protoset:
 	protoc \
 		--proto_path=resources \
 		--proto_path=external \
-		--descriptor_set_out=$(BUILD_DIR)/protoset/schema.protoset \
+		--descriptor_set_out=$(BUILD_DIR)/schema.protoset \
 		--include_imports \
 		resources/schema.proto
 
