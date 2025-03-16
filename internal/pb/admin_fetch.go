@@ -87,7 +87,7 @@ func (s *AdminServer) GetUser(ctx context.Context, uuid *m.UUID) (*m.User, error
 		updated time.Time
 	)
 
-	fetch := s.store.Common[db.GetSingleUser]
+	fetch := s.store.Common[db.GetUser]
 	row := fetch.QueryRowContext(ctx, uuid.Value)
 	if err := row.Scan(&name, &email, &created, &updated); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

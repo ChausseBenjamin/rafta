@@ -11,8 +11,8 @@ const (
 	CreateUserSecret
 	DeleteUser
 	GetAllUsers
-	GetSingleUser
-	GetSingleUserWithSecret
+	GetUser
+	GetUserWithSecret
 	GetUserCount
 	GetUserRoles
 	RevokeToken
@@ -52,11 +52,11 @@ var commonStatements = [...]struct {
 		Cmd:  `SELECT userID, name, email, createdAt, updatedAt FROM Users`,
 	},
 	{
-		Name: GetSingleUser,
+		Name: GetUser,
 		Cmd:  `SELECT name, email, createdAt, updatedAt FROM Users WHERE userID=(?)`,
 	},
 	{ // Get a single user with secret info and roles
-		Name: GetSingleUserWithSecret,
+		Name: GetUserWithSecret,
 		Cmd: `SELECT
 			Users.name,
 			Users.userID,

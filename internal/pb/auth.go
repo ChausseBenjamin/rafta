@@ -32,7 +32,7 @@ func (s *AuthServer) Login(ctx context.Context, _ *emptypb.Empty) (*m.LoginRespo
 
 	creds := util.GetFromContext[auth.Credentials](ctx, util.CredentialsKey)
 
-	stmt := s.store.Common[db.GetSingleUserWithSecret]
+	stmt := s.store.Common[db.GetUserWithSecret]
 	row := stmt.QueryRowContext(ctx, creds.Email)
 	err := row.Scan(&name, &uuid, &created, &updated, &hash)
 	if err != nil {
