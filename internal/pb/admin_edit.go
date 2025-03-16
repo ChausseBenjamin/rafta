@@ -13,7 +13,17 @@ import (
 )
 
 func (s *AdminServer) DeleteUser(ctx context.Context, id *m.UUID) (*emptypb.Empty, error) {
-	slog.InfoContext(ctx, "Received admin request to delete user")
+	creds, err := getCreds(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !hasRequiredRole(creds.Roles, allowedAdminRoles) {
+		return nil, status.Error(
+			codes.PermissionDenied,
+			"User does not have the authority to query all users",
+		)
+	}
+
 	cmd := s.store.Common[db.DeleteUser]
 	resp, err := cmd.ExecContext(ctx, id.Value)
 	if err != nil {
