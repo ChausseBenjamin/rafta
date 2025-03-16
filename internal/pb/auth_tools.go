@@ -2,11 +2,14 @@ package pb
 
 import (
 	"context"
+	"slices"
 
 	"github.com/ChausseBenjamin/rafta/internal/db"
-	"github.com/golang-jwt/jwt/v5"
 )
 
+// getUserRoles is meant to be used when creating JWT tokens.
+// Since login and signup only provide an email as an identifier, role
+// information has to be fetched from the database.
 func (s *AuthServer) getUserRoles(ctx context.Context, userID string) ([]string, error) {
 	stmt := s.store.Common[db.GetUserRoles]
 	rows, err := stmt.QueryContext(ctx, userID)
@@ -31,6 +34,11 @@ func (s *AuthServer) getUserRoles(ctx context.Context, userID string) ([]string,
 	return roles, nil
 }
 
-func revokeTokens(tokens []jwt.Token) {
-	panic("unimplemented")
+func hasRequiredRole(claimedRoles []string, allowedRoles []string) bool {
+	for _, role := range claimedRoles {
+		if slices.Contains(allowedRoles, role) {
+			return true
+		}
+	}
+	return false
 }

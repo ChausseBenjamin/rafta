@@ -92,13 +92,13 @@ func (s *AuthServer) Login(ctx context.Context, _ *emptypb.Empty) (*m.LoginRespo
 
 func (s *AuthServer) Signup(ctx context.Context, info *m.UserCredsRequest) (*m.SignupResponse, error) {
 	nbStmt := s.store.Common[db.GetUserCount]
-	var userNb int
-	err := nbStmt.QueryRowContext(ctx).Scan(&userNb)
+	var userCount int
+	err := nbStmt.QueryRowContext(ctx).Scan(&userCount)
 	if err != nil {
 		slog.WarnContext(ctx, "Failed to query the number of signed up users")
 	}
 
-	if !s.cfg.AllowNewUsers || (userNb >= int(s.cfg.MaxUsers)) {
+	if !s.cfg.AllowNewUsers || (userCount >= int(s.cfg.MaxUsers)) {
 		return nil, status.Errorf(codes.FailedPrecondition, "The server is not accepting new signups at this time")
 	}
 	// Email
