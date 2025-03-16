@@ -7,15 +7,18 @@ type statementName int
 // XXX: Make sure iota length is always the same as commonTransactions
 // WILL lead to an "index out of range" otherwise!
 const (
-	CreateUser statementName = iota
+	AssertUserExists statementName = iota
+	CreateUser
 	CreateUserSecret
 	DeleteUser
 	GetAllUsers
 	GetUser
-	GetUserWithSecret
 	GetUserCount
+	GetUserIDFromEmail
 	GetUserRoles
+	GetUserWithSecret
 	RevokeToken
+	UpdateUser
 
 // CreateTag
 // CreateRole
@@ -28,13 +31,16 @@ const (
 // GetAllTagsRelatedToTask
 // AssignRoleToUser
 // AssignTagToTask
-// UpdateSetting
 )
 
 var commonStatements = [...]struct {
 	Name statementName
 	Cmd  string
 }{
+	{
+		Name: AssertUserExists,
+		Cmd:  `SELECT EXISTS(SELECT 1 FROM Users WHERE userID = ?)`,
+	},
 	{ // Create a user (including salted secret)
 		Name: CreateUser,
 		Cmd:  `INSERT INTO Users (userID, name, email) VALUES (?, ?, ?)`,
@@ -55,6 +61,18 @@ var commonStatements = [...]struct {
 		Name: GetUser,
 		Cmd:  `SELECT name, email, createdAt, updatedAt FROM Users WHERE userID=(?)`,
 	},
+	{ // Get how many users are signed up
+		Name: GetUserCount,
+		Cmd:  `SELECT COUNT(*) FROM Users`,
+	},
+	{ // Get how many users are signed up
+		Name: GetUserIDFromEmail,
+		Cmd:  `SELECT userID FROM Users WHERE email=(?)`,
+	},
+	{ // Get all the roles assigned to a user
+		Name: GetUserRoles,
+		Cmd:  `SELECT role FROM UserRoles WHERE userID = ?`,
+	},
 	{ // Get a single user with secret info and roles
 		Name: GetUserWithSecret,
 		Cmd: `SELECT
@@ -70,17 +88,17 @@ var commonStatements = [...]struct {
 		WHERE
 			Users.email = ?`,
 	},
-	{ // Get how many users are signed up
-		Name: GetUserCount,
-		Cmd:  `SELECT COUNT(*) FROM Users`,
-	},
-	{ // Get all the roles assigned to a user
-		Name: GetUserRoles,
-		Cmd:  `SELECT role FROM UserRoles WHERE userID = ?`,
-	},
 	{ // Add a jwt token to the list of revoked tokens
 		Name: RevokeToken,
 		Cmd:  `INSERT INTO RevokedTokens (tokenID, expiration) VALUES (?, ?)`,
+	},
+	{
+		Name: UpdateUser,
+		Cmd: `UPDATE Users SET
+						name = ?,
+						email = ?,
+						updatedAt = ?
+					WHERE UserID = ?`,
 	},
 	// { // Create a tag
 	// 	Name: CreateTag,
@@ -113,10 +131,6 @@ var commonStatements = [...]struct {
 	// { // Remove a tag from a task
 	// 	Name: DeleteTagFromTask,
 	// 	Cmd:  "DELETE FROM TaskTags WHERE taskID = ? AND tagID = ?",
-	// },
-	// { // Update a setting KeyPair
-	// 	Name: UpdateSetting,
-	// 	Cmd:  "UPDATE Settings SET value = ? WHERE key = ?",
 	// },
 	// { // Get a single user
 	// 	Name: GetSingleUser,
