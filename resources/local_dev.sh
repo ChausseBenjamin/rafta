@@ -3,6 +3,8 @@
 localsecrets=".secrets"
 localruntime=".runtime"
 
+binpath="build/rafta"
+
 mkdir -p "$localsecrets" || exit 1
 [ -f "$localsecrets/.gitignore" ] || echo '*' > "$localsecrets/.gitignore"
 
@@ -23,6 +25,9 @@ EOF
 case "$1" in
   --print-config)
     echo "$env_vars"
+    ;;
+  --bin)
+    clear && shift && env $env_vars "$binpath" $@
     ;;
   *)
     clear && env $env_vars go run . $@
