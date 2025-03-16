@@ -2,9 +2,14 @@ package pb
 
 import (
 	"context"
+	"log/slog"
 	"slices"
 
+	"github.com/ChausseBenjamin/rafta/internal/auth"
 	"github.com/ChausseBenjamin/rafta/internal/db"
+	"github.com/ChausseBenjamin/rafta/internal/util"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // getUserRoles is meant to be used when creating JWT tokens.
@@ -32,6 +37,20 @@ func (s *AuthServer) getUserRoles(ctx context.Context, userID string) ([]string,
 	}
 
 	return roles, nil
+}
+
+// Since there are some encpoints that don't require authentication (ex: Signup)
+// The JWT interceptor can let unauthenticated request pass through. Not catching this
+// can (and will) lead to nil pointer dereferences.
+func getCreds(ctx context.Context) (*auth.Claims, error) {
+	creds := util.GetFromContext[auth.Claims](ctx, util.JwtKey)
+	if creds == nil {
+		slog.WarnContext(ctx, "User is not authenticated, cannot proceed with request")
+		return nil,
+			status.Error(codes.Unauthenticated, "Current endpoint requires JWT authentication to proceed, cannot continue")
+	} else {
+		return creds, nil
+	}
 }
 
 func hasRequiredRole(claimedRoles []string, allowedRoles []string) bool {

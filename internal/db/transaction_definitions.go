@@ -11,6 +11,7 @@ const (
 	CreateUserSecret
 	DeleteUser
 	GetAllUsers
+	GetSingleUser
 	GetSingleUserWithSecret
 	GetUserCount
 	GetUserRoles
@@ -22,7 +23,6 @@ const (
 // DeleteUnusedTags
 // DeleteRoleFromUser
 // DeleteTagFromTask
-// GetSingleUser
 // GetSingleTask
 // GetAllTasks
 // GetAllTagsRelatedToTask
@@ -50,6 +50,10 @@ var commonTransactions = [...]struct {
 	{
 		Name: GetAllUsers,
 		Cmd:  `SELECT userID, name, email, createdAt, updatedAt FROM Users`,
+	},
+	{
+		Name: GetSingleUser,
+		Cmd:  `SELECT name, email, createdAt, updatedAt FROM Users WHERE userID=(?)`,
 	},
 	{ // Get a single user with secret info and roles
 		Name: GetSingleUserWithSecret,
