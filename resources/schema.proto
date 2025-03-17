@@ -45,8 +45,8 @@ message User {
 }
 
 message TaskRecurrence {
-	string cron   = 1;
-	bool   active = 2;
+	string pattern = 1;
+	bool   active  = 2;
 }
 
 message TaskData {
@@ -57,10 +57,17 @@ message TaskData {
   uint32                    priority      = 3;
   TaskState                 state         = 4;
 	TaskRecurrence            recurrence    = 5;
-  google.protobuf.Timestamp created_on    = 6;
-  google.protobuf.Timestamp updated_on    = 7;
-  repeated string           tags          = 8;
+	TaskMetadata              metadata      = 6;
+  google.protobuf.Timestamp do_date       = 7;
+  google.protobuf.Timestamp due_date      = 8;
+  repeated string           tags          = 9;
 }
+
+message TaskMetadata {
+  google.protobuf.Timestamp created_on    = 1;
+  google.protobuf.Timestamp updated_on    = 2;
+}
+
 
 message TaskUpdateRequest {
 	UUID id        = 1;
@@ -70,12 +77,14 @@ message TaskUpdateRequest {
 
 message TaskUpdateResponse {
   TaskData               data  = 1;
-  repeated TaskFieldMask masks = 2;
+	TaskMetadata           meta  = 2;
+  repeated TaskFieldMask masks = 3;
 }
 
 message Task {
-  UUID     id   = 1;
-  TaskData data = 2;
+  UUID         id       = 1;
+  TaskData     data     = 2;
+	TaskMetadata metadata = 3;
 }
 
 message TaskList {
@@ -125,41 +134,39 @@ message PasswdMessage {
 // Any task involoving another users data is done via the Admin service.
 service Rafta {
 	// Retrieval
-  rpc GetUserInfo(google.protobuf.Empty) returns (User);
-  rpc GetTask(UUID) returns (Task); // Input: task UUID
   rpc GetAllTasks(google.protobuf.Empty) returns (TaskList);
+  rpc GetTask(UUID) returns (Task); // Input: task UUID
+  rpc GetUserInfo(google.protobuf.Empty) returns (User);
 
 	// User Manipulation
-	rpc UpdateUserInfo(User) returns (google.protobuf.Empty);
 	rpc DeleteUser(google.protobuf.Empty) returns (google.protobuf.Empty);
 	rpc UpdateCredentials(PasswdMessage) returns (google.protobuf.Empty);
+	rpc UpdateUserInfo(User) returns (google.protobuf.Empty);
 
   // Task Manipulation
+  rpc CreateTask(TaskData) returns (Task);
   rpc DeleteTask(UUID) returns (google.protobuf.Empty);
   rpc UpdateTask(TaskUpdateRequest) returns (TaskUpdateResponse);
-  rpc CreateTask(TaskData) returns (Task);
+
 }
 
 // Accessible only to users with the admin role
 service Admin {
   // Retrieval
-  rpc GetUserTasks(UUID) returns (TaskList);
   rpc GetAllUsers(google.protobuf.Empty) returns (UserList);
   rpc GetUser(UUID) returns (User);
+  rpc GetUserTasks(UUID) returns (TaskList);
 
-  // User Manipulation
+  // Manipulation
+	rpc UpdateCredentials(ChangePasswdRequest) returns (google.protobuf.Empty);
+  rpc CreateUser(UserSignupRequest) returns (google.protobuf.Empty);
   rpc DeleteUser(UUID) returns (google.protobuf.Empty);
   rpc UpdateUser(User) returns (google.protobuf.Empty);
-  rpc CreateUser(UserSignupRequest) returns (google.protobuf.Empty);
-	rpc UpdateCredentials(ChangePasswdRequest) returns (google.protobuf.Empty);
+
 }
 
-// Used only for signups and logins before a jwt is issued
 service Auth {
 	rpc Signup(UserSignupRequest) returns (SignupResponse);
-	// Login uses a Basic token in the header
-	// (`Authorization: Basic <base64>clientID:clientSecret</base64>`)
   rpc Login(google.protobuf.Empty) returns (LoginResponse);
-	// No refresh token is already in the header, no need for an input
   rpc Refresh(google.protobuf.Empty) returns (JWT);
 }

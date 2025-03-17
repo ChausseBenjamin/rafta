@@ -38,8 +38,8 @@ var schemaDefinitions = [...]struct {
 			description TEXT,
 			due TIMESTAMP,
 			do TIMESTAMP,
-			cron TEXT,
-			cronIsEnabled BOOLEAN NOT NULL DEFAULT FALSE,
+			recurrencePattern TEXT,
+			recurrenceEnabled BOOLEAN NOT NULL DEFAULT FALSE,
 			owner TEXT NOT NULL,
 			FOREIGN KEY (owner) REFERENCES Users(userID) ON DELETE CASCADE
 		);`,

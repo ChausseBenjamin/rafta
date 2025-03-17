@@ -7,7 +7,9 @@ type statementName int
 // XXX: Make sure iota length is always the same as commonTransactions
 // WILL lead to an "index out of range" otherwise!
 const (
-	AssertUserExists statementName = iota
+	AssertTaskExists statementName = iota
+	AssertUserExists
+	CreateTask
 	CreateUser
 	CreateUserSecret
 	DeleteUser
@@ -39,8 +41,19 @@ var commonStatements = [...]struct {
 	Cmd  string
 }{
 	{
+		Name: AssertTaskExists,
+		Cmd:  `SELECT EXISTS(SELECT 1 FROM Tasks WHERE TaskID = ?)`,
+	},
+	{
 		Name: AssertUserExists,
 		Cmd:  `SELECT EXISTS(SELECT 1 FROM Users WHERE userID = ?)`,
+	},
+	{
+		Name: CreateTask,
+		Cmd: `INSERT INTO Tasks
+					(taskID, title, priority, description due, do, cron, cronIsEnabled, owner)
+					VALUES
+					(?, ?, ?, ? ?, ?, ?, ?, ?)`,
 	},
 	{ // Create a user (including salted secret)
 		Name: CreateUser,

@@ -108,42 +108,9 @@ func (s *protoServer) newUser(ctx context.Context, req *m.UserSignupRequest) (*m
 		return nil, err
 	}
 
-	var (
-		exists   bool = true
-		attempts int
-		id       string
-		err      error
-	)
-	uniqueCheck := s.store.Common[db.AssertUserExists]
-	for !exists {
-		attempts++
-		id, err = uuid.GenerateUUID()
-		if err != nil {
-			slog.ErrorContext(ctx, "Failed to generate UUID", logging.ErrKey, err)
-			return nil, status.Errorf(codes.Internal,
-				"Couldn't generate a unique ID for the new user",
-			)
-		}
-		err := uniqueCheck.QueryRowContext(ctx, id).Scan(&exists)
-		if err != nil {
-			slog.ErrorContext(ctx, "Failed to ensure the generated UUID was unique",
-				"uuid", id,
-				logging.ErrKey, err,
-			)
-			return nil, status.Error(codes.Internal,
-				"Failed to generate a valid UUID",
-			)
-		}
-		if attempts >= maxUUIDGenAttempts {
-			slog.ErrorContext(ctx,
-				"Max uuid generation attemps reached during signup",
-				"attempts", maxUUIDGenAttempts,
-			)
-			return nil, status.Errorf(codes.Internal,
-				"Max uuid generation attemps reached",
-			)
-		}
-
+	id, err := s.generateUniqueUUID(ctx, s.store.Common[db.AssertUserExists])
+	if err != nil {
+		return nil, err
 	}
 
 	hash, err := auth.GenerateHash(req.UserSecret)
@@ -179,6 +146,45 @@ func (s *protoServer) newUser(ctx context.Context, req *m.UserSignupRequest) (*m
 		Id:   &m.UUID{Value: id},
 		Data: req.User,
 	}, nil
+}
+
+func (s *protoServer) generateUniqueUUID(ctx context.Context, uniqueCheck *sql.Stmt) (string, error) {
+	var (
+		exists   bool = true
+		attempts int
+		id       string
+		err      error
+	)
+	for !exists {
+		attempts++
+		id, err = uuid.GenerateUUID()
+		if err != nil {
+			slog.ErrorContext(ctx, "Failed to generate UUID", logging.ErrKey, err)
+			return "", status.Errorf(codes.Internal,
+				"Couldn't generate a unique ID",
+			)
+		}
+		err := uniqueCheck.QueryRowContext(ctx, id).Scan(&exists)
+		if err != nil {
+			slog.ErrorContext(ctx, "Failed to ensure the generated UUID was unique",
+				"uuid", id,
+				logging.ErrKey, err,
+			)
+			return "", status.Error(codes.Internal,
+				"Failed to generate a valid UUID",
+			)
+		}
+		if attempts >= maxUUIDGenAttempts {
+			slog.ErrorContext(ctx,
+				"Max uuid generation attempts reached",
+				"attempts", maxUUIDGenAttempts,
+			)
+			return "", status.Errorf(codes.Internal,
+				"Max uuid generation attempts reached",
+			)
+		}
+	}
+	return id, nil
 }
 
 // checkUserExistence helps preventing errors if an admin tries to update/delete a non-existent user

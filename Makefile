@@ -17,6 +17,7 @@ codegen: setup
 		resources/schema.proto
 
 protoset: setup
+	mkdir -p $(BUILD_DIR) || exit 1
 	protoc \
 		--proto_path=resources \
 		--proto_path=external \
