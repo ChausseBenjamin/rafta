@@ -49,12 +49,12 @@ func (s *authServer) getUserRoles(ctx context.Context, userID string) ([]string,
 	return roles, nil
 }
 
-func validatePasswd(p string, minLen int, maxLen int) error {
+func (s *protoServer) validatePasswd(p string) error {
 	// Password length
-	if l := len(p); l < minLen || l > maxLen {
+	if l := len(p); l < s.cfg.MinPasswdLen || l > s.cfg.MaxPasswdLen {
 		return status.Errorf(codes.InvalidArgument,
 			"Provided password is of length %d which is outside of the accepted range [%d-%d]",
-			l, minLen, maxLen,
+			l, s.cfg.MinPasswdLen, s.cfg.MaxPasswdLen,
 		)
 	}
 	// Illegal password characters
@@ -101,7 +101,7 @@ func (s *protoServer) newUser(ctx context.Context, req *m.UserSignupRequest) (*m
 		)
 	}
 
-	if err := validatePasswd(req.UserSecret, s.cfg.MinPasswdLen, s.cfg.MaxPasswdLen); err != nil {
+	if err := s.validatePasswd(req.UserSecret); err != nil {
 		return nil, err
 	}
 

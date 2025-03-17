@@ -91,11 +91,6 @@ message JWT {
   string refresh = 2;
 }
 
-message Credentials {
-  string email  = 1;
-  string secret = 2;
-}
-
 message LoginResponse {
   User user  = 1;
   JWT tokens = 2;
@@ -120,6 +115,10 @@ message ChangePasswdRequest {
 	string secret = 2;
 }
 
+message PasswdMessage {
+	string secret = 1;
+}
+
 // Accessible to all users only once authenticated
 // Many methods take `.Empty` as an input since users can only
 // query/mutate their own data (which is implied from authentication).
@@ -133,7 +132,7 @@ service Rafta {
 	// User Manipulation
 	rpc UpdateUserInfo(User) returns (google.protobuf.Empty);
 	rpc DeleteUser(google.protobuf.Empty) returns (google.protobuf.Empty);
-	rpc ChangeCredentials(Credentials) returns (google.protobuf.Empty);
+	rpc ChangeCredentials(PasswdMessage) returns (google.protobuf.Empty);
 
   // Task Manipulation
   rpc DeleteTask(UUID) returns (google.protobuf.Empty);

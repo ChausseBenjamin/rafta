@@ -106,7 +106,7 @@ func (s *adminServer) CreateUser(ctx context.Context, req *m.UserSignupRequest) 
 }
 
 func (s *adminServer) UpdateCredentials(ctx context.Context, req *m.ChangePasswdRequest) (*emptypb.Empty, error) {
-	if err := validatePasswd(req.Secret, s.cfg.MinPasswdLen, s.cfg.MaxPasswdLen); err != nil {
+	if err := s.validatePasswd(req.Secret); err != nil {
 		return nil, err
 	}
 
