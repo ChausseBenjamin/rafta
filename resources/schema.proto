@@ -132,7 +132,7 @@ service Rafta {
 	// User Manipulation
 	rpc UpdateUserInfo(User) returns (google.protobuf.Empty);
 	rpc DeleteUser(google.protobuf.Empty) returns (google.protobuf.Empty);
-	rpc ChangeCredentials(PasswdMessage) returns (google.protobuf.Empty);
+	rpc UpdateCredentials(PasswdMessage) returns (google.protobuf.Empty);
 
   // Task Manipulation
   rpc DeleteTask(UUID) returns (google.protobuf.Empty);

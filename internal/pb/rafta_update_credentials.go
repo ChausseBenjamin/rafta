@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-func (s *raftaServer) ChangeCredentials(ctx context.Context, psswd *m.PasswdMessage) (*emptypb.Empty, error) {
+func (s *raftaServer) UpdateCredentials(ctx context.Context, psswd *m.PasswdMessage) (*emptypb.Empty, error) {
 	creds, err := getCreds(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx,
