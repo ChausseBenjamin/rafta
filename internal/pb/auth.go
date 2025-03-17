@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
-	"net/mail"
-	"strings"
 	"time"
 
 	"github.com/ChausseBenjamin/rafta/internal/auth"
@@ -14,7 +12,6 @@ import (
 	"github.com/ChausseBenjamin/rafta/internal/logging"
 	"github.com/ChausseBenjamin/rafta/internal/util"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
-	"github.com/hashicorp/go-uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -101,73 +98,20 @@ func (s *authServer) Signup(ctx context.Context, info *m.UserCredsRequest) (*m.S
 	if !s.cfg.AllowNewUsers || (userCount >= int(s.cfg.MaxUsers)) {
 		return nil, status.Errorf(codes.FailedPrecondition, "The server is not accepting new signups at this time")
 	}
-	// Email
-	if _, err := mail.ParseAddress(info.User.Email); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument,
-			"Provided email is not properly formatted: '%s'", info.User.Email,
-		)
-	}
-	// Password length
-	if l := len(info.UserSecret); l < s.cfg.MinPasswdLen || l > s.cfg.MaxPasswdLen {
-		return nil, status.Errorf(codes.InvalidArgument,
-			"Provided password is of length %d which is outside of the accepted range [%d-%d]",
-			l, s.cfg.MinPasswdLen, s.cfg.MaxPasswdLen,
-		)
-	}
-	// Illegal password characters
-	for _, r := range info.UserSecret {
-		if r < 32 || r > 126 {
-			return nil, status.Errorf(codes.InvalidArgument,
-				"Provided password contains illegal characters. Allowed characters are in the [32-126] range (https://www.ascii-code.com)",
-			)
-		}
-	}
 
-	uuid, err := uuid.GenerateUUID()
+	ps := &protoServer{cfg: s.cfg, store: s.store}
+	user, err := ps.newUser(ctx, info)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to generate UUID", logging.ErrKey, err)
-		return nil, status.Errorf(codes.Internal,
-			"Couldn't generate a unique ID for the new user",
-		)
+		return nil, err
 	}
 
-	hash, err := auth.GenerateHash(info.UserSecret)
-	if err != nil {
-		slog.ErrorContext(ctx, "Failed to hash user password", logging.ErrKey, err)
-		return nil, status.Errorf(codes.Internal,
-			"Couldn't create a hash for user authentication",
-		)
-	}
-
-	tx, errTx := s.store.DB.BeginTx(ctx, nil)
-	insertUser := tx.StmtContext(ctx, s.store.Common[db.CreateUser])
-	insertSecret := tx.StmtContext(ctx, s.store.Common[db.CreateUserSecret])
-
-	_, errInsertUser := insertUser.ExecContext(ctx, uuid, info.User.Name, info.User.Email)
-	_, errInsertSecret := insertSecret.ExecContext(ctx, uuid, hash)
-
-	if err := errors.Join(errTx, errInsertUser, errInsertSecret); err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
-			return nil, status.Errorf(codes.AlreadyExists,
-				"There is already a user with the email: '%s'", info.User.Email,
-			)
-		}
-		slog.ErrorContext(ctx, "Unable to insert user into database", logging.ErrKey, err)
-		return nil, status.Errorf(codes.Internal, "Failed to insert new user into the database")
-	}
-
-	if err := tx.Commit(); err != nil {
-		slog.ErrorContext(ctx, "Committing user to database failed", logging.ErrKey, err)
-		return nil, status.Errorf(codes.Internal, "Failed to insert new user into the database")
-	}
-
-	roles, err := s.getUserRoles(ctx, uuid)
+	roles, err := s.getUserRoles(ctx, user.Id.Value)
 	if err != nil {
 		slog.WarnContext(ctx, "Failed to retrieve user roles for JWT creation")
 		return nil, err
 	}
 
-	access, refresh, err := s.authMgr.Issue(uuid, roles)
+	access, refresh, err := s.authMgr.Issue(user.Id.Value, roles)
 	if err != nil {
 		slog.WarnContext(ctx, "Failed to generate new JTW pair")
 	}
@@ -175,7 +119,7 @@ func (s *authServer) Signup(ctx context.Context, info *m.UserCredsRequest) (*m.S
 	slog.InfoContext(ctx, "Successful user signup")
 	return &m.SignupResponse{
 		User: &m.User{
-			Id: &m.UUID{Value: uuid},
+			Id: &m.UUID{Value: user.Id.Value},
 			Data: &m.UserData{
 				Name:  info.User.Name,
 				Email: info.User.Email,
@@ -184,8 +128,8 @@ func (s *authServer) Signup(ctx context.Context, info *m.UserCredsRequest) (*m.S
 				// NOTE: Since sqlite defaults to the current time
 				// we assume the difference with time.Now() is negligible
 				// It will be "correctly" sent on next login anyway...
-				CreatedOn: timestamppb.Now(),
-				UpdatedOn: timestamppb.Now(),
+				CreatedOn: timestamppb.New(time.Now().UTC()),
+				UpdatedOn: timestamppb.New(time.Now().UTC()),
 			},
 		},
 		Tokens: &m.JWT{

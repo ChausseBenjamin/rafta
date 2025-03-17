@@ -17,6 +17,12 @@ import (
 
 var ErrOutOfBoundsPort = errors.New("given port is out of bounds (1024-65535)")
 
+// used to simplify wrapping for certain tasks
+type protoServer struct {
+	store *db.Store
+	cfg   *util.ConfigStore
+}
+
 type raftaServer struct {
 	store *db.Store
 	cfg   *util.ConfigStore

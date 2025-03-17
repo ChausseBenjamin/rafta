@@ -245,7 +245,7 @@ func fetchTableSQL(db *sql.DB, table string) (string, error) {
 func backupFile(ctx context.Context, path string) {
 	backupPath := path + ".bak"
 	if _, err := os.Stat(backupPath); err == nil {
-		backupPath = fmt.Sprintf("%s-%s.bak", path, time.Now().Format(time.RFC3339))
+		backupPath = fmt.Sprintf("%s-%s.bak", path, time.Now().UTC().Format(time.RFC3339))
 	}
 	if err := os.Rename(path, backupPath); err != nil {
 		slog.ErrorContext(ctx, "failed to backup file",
