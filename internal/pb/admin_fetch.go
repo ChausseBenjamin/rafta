@@ -58,8 +58,8 @@ func (s *AdminServer) GetAllUsers(ctx context.Context, _ *emptypb.Empty) (*m.Use
 				Email: email,
 			},
 			Metadata: &m.UserMetadata{
-				CreatedOn: timestamppb.New(created),
-				UpdatedOn: timestamppb.New(updated),
+				CreatedOn: timestamppb.New(created.UTC()),
+				UpdatedOn: timestamppb.New(updated.UTC()),
 			},
 		})
 	}
