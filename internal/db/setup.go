@@ -77,67 +77,63 @@ func Setup(ctx context.Context, path string) (*Store, error) {
 	slog.DebugContext(ctx, "Setting up database connection")
 	var db *sql.DB
 	var err error
+	var integrity string
 
 	// If file does not exist, generate a new DB.
-	if _, err := os.Stat(path); err != nil {
-		_, err = genDB(ctx, path)
+	if _, statErr := os.Stat(path); statErr != nil {
+		_, genErr := genDB(ctx, path)
+		if genErr != nil {
+			return nil, genErr
+		}
+	} else {
+		db, err = sql.Open("sqlite", path+opts())
 		if err != nil {
-			return nil, err
+			slog.ErrorContext(ctx, "failed to open DB", "error", err)
+			backupFile(ctx, path)
+			db, err = genDB(ctx, path)
 		}
 	}
 
-	db, err = sql.Open("sqlite", path+opts())
+	if err == nil {
+		_, err = db.Exec("PRAGMA foreign_keys = ON")
+	}
+
+	if err == nil {
+		_, err = db.Exec("PRAGMA journal_mode=WAL")
+	}
+
+	if err == nil {
+		queryErr := db.QueryRow("PRAGMA integrity_check;").Scan(&integrity)
+		if queryErr != nil || integrity != "ok" {
+			if queryErr != nil {
+				slog.ErrorContext(ctx, "integrity check query failed", "error", queryErr)
+			} else {
+				slog.ErrorContext(ctx, "integrity check failed", "integrity", integrity)
+			}
+			db.Close()
+			backupFile(ctx, path)
+			db, err = genDB(ctx, path)
+		}
+	}
+
+	if err == nil {
+		schemaErr := validateSchema(ctx, db)
+		if schemaErr != nil {
+			slog.ErrorContext(ctx, "schema validation failed", "error", schemaErr)
+			db.Close()
+			backupFile(ctx, path)
+			db, err = genDB(ctx, path)
+		}
+	}
+
+	if err == nil {
+		adminErr := validateAdmin(ctx, db)
+		if adminErr != nil {
+			err = adminErr
+		}
+	}
+
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to open DB", "error", err)
-		backupFile(ctx, path)
-		db, err = genDB(ctx, path)
-		if err != nil {
-			return nil, err
-		}
-		return new(db)
-	}
-
-	_, err = db.Exec("PRAGMA foreign_keys = ON")
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = db.Exec("PRAGMA journal_mode=WAL")
-	if err != nil {
-		return nil, err
-	}
-
-	// Run integrity check.
-	var integrity string
-	if err = db.QueryRow("PRAGMA integrity_check;").Scan(&integrity); err != nil || integrity != "ok" {
-		if err != nil {
-			slog.ErrorContext(ctx, "integrity check query failed", "error", err)
-		} else {
-			slog.ErrorContext(ctx, "integrity check failed", "integrity", integrity)
-		}
-		db.Close()
-		backupFile(ctx, path)
-		db, err = genDB(ctx, path)
-		if err != nil {
-			return nil, err
-		}
-		return new(db)
-	}
-
-	// Validate the PRAGMA settings and each table's schema.
-	if err = validateSchema(ctx, db); err != nil {
-		slog.ErrorContext(ctx, "schema validation failed", "error", err)
-		db.Close()
-		backupFile(ctx, path)
-		db, err = genDB(ctx, path)
-		if err != nil {
-			return nil, err
-		}
-		return new(db)
-	}
-
-	// Ensure there is at least one admin user in the database
-	if err := validateAdmin(ctx, db); err != nil {
 		return nil, err
 	}
 
