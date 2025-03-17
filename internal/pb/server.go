@@ -14,7 +14,11 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-var ErrOutOfBoundsPort = errors.New("given port is out of bounds (1024-65535)")
+var (
+	ErrOutOfBoundsPort = errors.New("given port is out of bounds (1024-65535)")
+
+	allowedAdminRoles []string = []string{"ADMIN"}
+)
 
 // used to simplify wrapping for certain tasks
 type protoServer struct {

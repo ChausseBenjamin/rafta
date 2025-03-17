@@ -13,14 +13,6 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-func (s *raftaServer) UpdateUserInfo(ctx context.Context, val *m.User) (*emptypb.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "Server still under construction...")
-}
-
-func (s *raftaServer) DeleteUser(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "Server still under construction...")
-}
-
 func (s *raftaServer) ChangeCredentials(ctx context.Context, psswd *m.PasswdMessage) (*emptypb.Empty, error) {
 	creds, err := getCreds(ctx)
 	if err != nil {
@@ -58,12 +50,4 @@ func (s *raftaServer) ChangeCredentials(ctx context.Context, psswd *m.PasswdMess
 	}
 
 	return &emptypb.Empty{}, nil
-}
-
-func (s *raftaServer) DeleteTask(ctx context.Context, val *m.UUID) (*emptypb.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "Server still under construction...")
-}
-
-func (s *raftaServer) CreateTask(ctx context.Context, val *m.TaskData) (*m.Task, error) {
-	return nil, status.Error(codes.Unimplemented, "Server still under construction...")
 }
