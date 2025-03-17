@@ -92,7 +92,10 @@ func hasRequiredRole(claimedRoles []string, allowedRoles []string) bool {
 }
 
 // newUser is a centralized function for signing up so that admins creating users or public clients
-// signing go through the same logic flow.
+// signing go through the same logic flow. The only difference between both flows is that admins are
+// not constrained by wether the max number of signup has been reached or if public signups are
+// currently allowed. Also, admins don't receive a JWT for the new user when creating them but it is
+// assumed that a newly signed up user might want to.
 func (s *protoServer) newUser(ctx context.Context, req *m.UserSignupRequest) (*m.User, error) {
 	// Email
 	if _, err := mail.ParseAddress(req.User.Email); err != nil {
