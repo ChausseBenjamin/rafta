@@ -87,7 +87,7 @@ func (s *authServer) Login(ctx context.Context, _ *emptypb.Empty) (*m.LoginRespo
 	}, nil
 }
 
-func (s *authServer) Signup(ctx context.Context, info *m.UserCredsRequest) (*m.SignupResponse, error) {
+func (s *authServer) Signup(ctx context.Context, req *m.UserSignupRequest) (*m.SignupResponse, error) {
 	nbStmt := s.store.Common[db.GetUserCount]
 	var userCount int
 	err := nbStmt.QueryRowContext(ctx).Scan(&userCount)
@@ -99,7 +99,7 @@ func (s *authServer) Signup(ctx context.Context, info *m.UserCredsRequest) (*m.S
 		return nil, status.Errorf(codes.FailedPrecondition, "The server is not accepting new signups at this time")
 	}
 
-	user, err := s.newUser(ctx, info)
+	user, err := s.newUser(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -120,8 +120,8 @@ func (s *authServer) Signup(ctx context.Context, info *m.UserCredsRequest) (*m.S
 		User: &m.User{
 			Id: &m.UUID{Value: user.Id.Value},
 			Data: &m.UserData{
-				Name:  info.User.Name,
-				Email: info.User.Email,
+				Name:  req.User.Name,
+				Email: req.User.Email,
 			},
 			Metadata: &m.UserMetadata{
 				// NOTE: Since sqlite defaults to the current time

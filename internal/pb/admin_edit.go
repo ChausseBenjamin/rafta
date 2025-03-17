@@ -6,6 +6,7 @@ import (
 	"net/mail"
 	"time"
 
+	"github.com/ChausseBenjamin/rafta/internal/auth"
 	"github.com/ChausseBenjamin/rafta/internal/db"
 	"github.com/ChausseBenjamin/rafta/internal/logging"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
@@ -95,8 +96,8 @@ func (s *adminServer) UpdateUser(ctx context.Context, user *m.User) (*emptypb.Em
 	return &emptypb.Empty{}, nil
 }
 
-func (s *adminServer) CreateUser(ctx context.Context, info *m.UserCredsRequest) (*emptypb.Empty, error) {
-	_, err := s.newUser(ctx, info)
+func (s *adminServer) CreateUser(ctx context.Context, req *m.UserSignupRequest) (*emptypb.Empty, error) {
+	_, err := s.newUser(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +105,30 @@ func (s *adminServer) CreateUser(ctx context.Context, info *m.UserCredsRequest) 
 	return &emptypb.Empty{}, nil
 }
 
-func (s *adminServer) UpdateCredentials(ctx context.Context, user *m.UserCredsRequest) (*emptypb.Empty, error) {
-	return nil, nil
+func (s *adminServer) UpdateCredentials(ctx context.Context, req *m.ChangePasswdRequest) (*emptypb.Empty, error) {
+	if err := validatePasswd(req.Secret, s.cfg.MinPasswdLen, s.cfg.MaxPasswdLen); err != nil {
+		return nil, err
+	}
+
+	hash, err := auth.GenerateHash(req.Secret)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to hash user password", logging.ErrKey, err)
+		return nil, status.Errorf(codes.Internal,
+			"Couldn't create a hash for user authentication",
+		)
+	}
+
+	stmt := s.store.Common[db.UpdateUserPasswd]
+	_, err = stmt.ExecContext(ctx, hash, req.Id.Value)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to change user password",
+			"uuid", req.Id.Value,
+			logging.ErrKey, err,
+		)
+		return nil, status.Errorf(codes.Internal,
+			"Failed to update password for user '%s'", req.Id.Value,
+		)
+	}
+
+	return &emptypb.Empty{}, nil
 }

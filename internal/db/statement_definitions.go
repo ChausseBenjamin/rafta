@@ -19,6 +19,7 @@ const (
 	GetUserWithSecret
 	RevokeToken
 	UpdateUser
+	UpdateUserPasswd
 
 // CreateTag
 // CreateRole
@@ -99,6 +100,10 @@ var commonStatements = [...]struct {
 						email = ?,
 						updatedAt = ?
 					WHERE UserID = ?`,
+	},
+	{
+		Name: UpdateUserPasswd,
+		Cmd:  `Update UserSecrets SET saltAndHash = ? WHERE userID = ?`,
 	},
 	// { // Create a tag
 	// 	Name: CreateTag,

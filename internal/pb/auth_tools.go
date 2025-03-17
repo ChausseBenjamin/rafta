@@ -49,6 +49,25 @@ func (s *authServer) getUserRoles(ctx context.Context, userID string) ([]string,
 	return roles, nil
 }
 
+func validatePasswd(p string, minLen int, maxLen int) error {
+	// Password length
+	if l := len(p); l < minLen || l > maxLen {
+		return status.Errorf(codes.InvalidArgument,
+			"Provided password is of length %d which is outside of the accepted range [%d-%d]",
+			l, minLen, maxLen,
+		)
+	}
+	// Illegal password characters
+	for _, r := range p {
+		if r < 32 || r > 126 {
+			return status.Errorf(codes.InvalidArgument,
+				"Provided password contains illegal characters. Allowed characters are in the [32-126] range (https://www.ascii-code.com)",
+			)
+		}
+	}
+	return nil
+}
+
 // Since there are some encpoints that don't require authentication (ex: Signup)
 // The JWT interceptor can let unauthenticated request pass through. Not catching this
 // can (and will) lead to nil pointer dereferences.
@@ -74,27 +93,16 @@ func hasRequiredRole(claimedRoles []string, allowedRoles []string) bool {
 
 // newUser is a centralized function for signing up so that admins creating users or public clients
 // signing go through the same logic flow.
-func (s *protoServer) newUser(ctx context.Context, info *m.UserCredsRequest) (*m.User, error) {
+func (s *protoServer) newUser(ctx context.Context, req *m.UserSignupRequest) (*m.User, error) {
 	// Email
-	if _, err := mail.ParseAddress(info.User.Email); err != nil {
+	if _, err := mail.ParseAddress(req.User.Email); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument,
-			"Provided email is not properly formatted: '%s'", info.User.Email,
+			"Provided email is not properly formatted: '%s'", req.User.Email,
 		)
 	}
-	// Password length
-	if l := len(info.UserSecret); l < s.cfg.MinPasswdLen || l > s.cfg.MaxPasswdLen {
-		return nil, status.Errorf(codes.InvalidArgument,
-			"Provided password is of length %d which is outside of the accepted range [%d-%d]",
-			l, s.cfg.MinPasswdLen, s.cfg.MaxPasswdLen,
-		)
-	}
-	// Illegal password characters
-	for _, r := range info.UserSecret {
-		if r < 32 || r > 126 {
-			return nil, status.Errorf(codes.InvalidArgument,
-				"Provided password contains illegal characters. Allowed characters are in the [32-126] range (https://www.ascii-code.com)",
-			)
-		}
+
+	if err := validatePasswd(req.UserSecret, s.cfg.MinPasswdLen, s.cfg.MaxPasswdLen); err != nil {
+		return nil, err
 	}
 
 	var (
@@ -135,7 +143,7 @@ func (s *protoServer) newUser(ctx context.Context, info *m.UserCredsRequest) (*m
 
 	}
 
-	hash, err := auth.GenerateHash(info.UserSecret)
+	hash, err := auth.GenerateHash(req.UserSecret)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to hash user password", logging.ErrKey, err)
 		return nil, status.Errorf(codes.Internal,
@@ -147,13 +155,13 @@ func (s *protoServer) newUser(ctx context.Context, info *m.UserCredsRequest) (*m
 	insertUser := tx.StmtContext(ctx, s.store.Common[db.CreateUser])
 	insertSecret := tx.StmtContext(ctx, s.store.Common[db.CreateUserSecret])
 
-	_, errInsertUser := insertUser.ExecContext(ctx, id, info.User.Name, info.User.Email)
+	_, errInsertUser := insertUser.ExecContext(ctx, id, req.User.Name, req.User.Email)
 	_, errInsertSecret := insertSecret.ExecContext(ctx, id, hash)
 
 	if err := errors.Join(errTx, errInsertUser, errInsertSecret); err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 			return nil, status.Errorf(codes.AlreadyExists,
-				"There is already a user with the email: '%s'", info.User.Email,
+				"There is already a user with the email: '%s'", req.User.Email,
 			)
 		}
 		slog.ErrorContext(ctx, "Unable to insert user into database", logging.ErrKey, err)
@@ -166,7 +174,7 @@ func (s *protoServer) newUser(ctx context.Context, info *m.UserCredsRequest) (*m
 	}
 	return &m.User{
 		Id:   &m.UUID{Value: id},
-		Data: info.User,
+		Data: req.User,
 	}, nil
 }
 
