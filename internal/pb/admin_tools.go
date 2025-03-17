@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func (s *AdminServer) checkUserExistence(ctx context.Context, userID, action string) error {
+func (s *adminServer) checkUserExistence(ctx context.Context, userID, action string) error {
 	assertExistence := s.store.Common[db.AssertUserExists]
 	row := assertExistence.QueryRowContext(ctx, userID)
 	userExists := false
@@ -39,7 +39,7 @@ func (s *AdminServer) checkUserExistence(ctx context.Context, userID, action str
 	return nil
 }
 
-func (s *AdminServer) checkEmailCollision(ctx context.Context, email, userID, action string) error {
+func (s *adminServer) checkEmailCollision(ctx context.Context, email, userID, action string) error {
 	checkEmailCollision := s.store.Common[db.GetUserIDFromEmail]
 	rows, err := checkEmailCollision.QueryContext(ctx, email)
 	if err != nil {

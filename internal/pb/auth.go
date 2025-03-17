@@ -21,7 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func (s *AuthServer) Login(ctx context.Context, _ *emptypb.Empty) (*m.LoginResponse, error) {
+func (s *authServer) Login(ctx context.Context, _ *emptypb.Empty) (*m.LoginResponse, error) {
 	var (
 		name    string
 		uuid    string
@@ -90,7 +90,7 @@ func (s *AuthServer) Login(ctx context.Context, _ *emptypb.Empty) (*m.LoginRespo
 	}, nil
 }
 
-func (s *AuthServer) Signup(ctx context.Context, info *m.UserCredsRequest) (*m.SignupResponse, error) {
+func (s *authServer) Signup(ctx context.Context, info *m.UserCredsRequest) (*m.SignupResponse, error) {
 	nbStmt := s.store.Common[db.GetUserCount]
 	var userCount int
 	err := nbStmt.QueryRowContext(ctx).Scan(&userCount)
@@ -195,7 +195,7 @@ func (s *AuthServer) Signup(ctx context.Context, info *m.UserCredsRequest) (*m.S
 	}, nil
 }
 
-func (a *AuthServer) Refresh(ctx context.Context, _ *emptypb.Empty) (*m.JWT, error) {
+func (a *authServer) Refresh(ctx context.Context, _ *emptypb.Empty) (*m.JWT, error) {
 	claims := util.GetFromContext[auth.Claims](ctx, util.JwtKey)
 	if claims == nil {
 		slog.ErrorContext(ctx,

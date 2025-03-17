@@ -15,7 +15,7 @@ import (
 // getUserRoles is meant to be used when creating JWT tokens.
 // Since login and signup only provide an email as an identifier, role
 // information has to be fetched from the database.
-func (s *AuthServer) getUserRoles(ctx context.Context, userID string) ([]string, error) {
+func (s *authServer) getUserRoles(ctx context.Context, userID string) ([]string, error) {
 	stmt := s.store.Common[db.GetUserRoles]
 	rows, err := stmt.QueryContext(ctx, userID)
 	if err != nil {

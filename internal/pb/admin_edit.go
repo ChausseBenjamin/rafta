@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-func (s *AdminServer) DeleteUser(ctx context.Context, id *m.UUID) (*emptypb.Empty, error) {
+func (s *adminServer) DeleteUser(ctx context.Context, id *m.UUID) (*emptypb.Empty, error) {
 	creds, err := getCreds(ctx)
 	if err != nil {
 		return nil, err
@@ -44,7 +44,7 @@ func (s *AdminServer) DeleteUser(ctx context.Context, id *m.UUID) (*emptypb.Empt
 	return &emptypb.Empty{}, nil
 }
 
-func (s *AdminServer) UpdateUser(ctx context.Context, user *m.User) (*emptypb.Empty, error) {
+func (s *adminServer) UpdateUser(ctx context.Context, user *m.User) (*emptypb.Empty, error) {
 	creds, err := getCreds(ctx)
 	if err != nil {
 		return nil, err
@@ -64,7 +64,7 @@ func (s *AdminServer) UpdateUser(ctx context.Context, user *m.User) (*emptypb.Em
 		return nil, err
 	}
 
-	// Ensure the new email is still a valid email
+	// Ensure the new email is still a valid email format
 	if _, err := mail.ParseAddress(user.Data.Email); err != nil {
 		slog.WarnContext(ctx,
 			"Admin attempted to update a user with an invalid email format",
@@ -93,4 +93,12 @@ func (s *AdminServer) UpdateUser(ctx context.Context, user *m.User) (*emptypb.Em
 	}
 
 	return &emptypb.Empty{}, nil
+}
+
+func (s *adminServer) CreateUser(ctx context.Context, user *m.UserCredsRequest) (*emptypb.Empty, error) {
+	return nil, nil
+}
+
+func (s *adminServer) UpdateCredentials(ctx context.Context, user *m.UserCredsRequest) (*emptypb.Empty, error) {
+	return nil, nil
 }

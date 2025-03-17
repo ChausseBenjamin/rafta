@@ -20,7 +20,7 @@ import (
 
 var allowedAdminRoles []string = []string{"ADMIN"}
 
-func (s *AdminServer) GetAllUsers(ctx context.Context, _ *emptypb.Empty) (*m.UserList, error) {
+func (s *adminServer) GetAllUsers(ctx context.Context, _ *emptypb.Empty) (*m.UserList, error) {
 	creds := util.GetFromContext[auth.Claims](ctx, util.JwtKey)
 	if !hasRequiredRole(creds.Roles, allowedAdminRoles) {
 		return nil, status.Error(
@@ -67,7 +67,7 @@ func (s *AdminServer) GetAllUsers(ctx context.Context, _ *emptypb.Empty) (*m.Use
 	return &m.UserList{Users: users}, nil
 }
 
-func (s *AdminServer) GetUser(ctx context.Context, uuid *m.UUID) (*m.User, error) {
+func (s *adminServer) GetUser(ctx context.Context, uuid *m.UUID) (*m.User, error) {
 	creds, err := getCreds(ctx)
 	if err != nil {
 		return nil, err
@@ -116,6 +116,6 @@ func (s *AdminServer) GetUser(ctx context.Context, uuid *m.UUID) (*m.User, error
 	}, nil
 }
 
-func (s *AdminServer) GetUserTasks(context.Context, *m.UUID) (*m.TaskList, error) {
+func (s *adminServer) GetUserTasks(context.Context, *m.UUID) (*m.TaskList, error) {
 	return nil, nil
 }

@@ -17,35 +17,35 @@ import (
 
 var ErrOutOfBoundsPort = errors.New("given port is out of bounds (1024-65535)")
 
-type RaftaServer struct {
+type raftaServer struct {
 	store *db.Store
 	cfg   *util.ConfigStore
 	m.UnimplementedRaftaServer
 }
 
-type AdminServer struct {
+type adminServer struct {
 	store *db.Store
 	cfg   *util.ConfigStore
 	m.UnimplementedAdminServer
 }
 
-type AuthServer struct {
+type authServer struct {
 	store   *db.Store
 	authMgr *auth.AuthManager // To issue tokens
 	cfg     *util.ConfigStore
 	m.UnimplementedAuthServer
 }
 
-func NewRaftaServer(store *db.Store, cfg *util.ConfigStore) *RaftaServer {
-	return &RaftaServer{store: store, cfg: cfg}
+func NewRaftaServer(store *db.Store, cfg *util.ConfigStore) *raftaServer {
+	return &raftaServer{store: store, cfg: cfg}
 }
 
-func NewAdminServer(store *db.Store, cfg *util.ConfigStore) *AdminServer {
-	return &AdminServer{store: store, cfg: cfg}
+func NewAdminServer(store *db.Store, cfg *util.ConfigStore) *adminServer {
+	return &adminServer{store: store, cfg: cfg}
 }
 
-func NewAuthServer(store *db.Store, authMgr *auth.AuthManager, cfg *util.ConfigStore) *AuthServer {
-	return &AuthServer{store: store, authMgr: authMgr, cfg: cfg}
+func NewAuthServer(store *db.Store, authMgr *auth.AuthManager, cfg *util.ConfigStore) *authServer {
+	return &authServer{store: store, authMgr: authMgr, cfg: cfg}
 }
 
 // Setup creates a new gRPC with both services
