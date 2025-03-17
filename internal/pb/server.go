@@ -8,7 +8,6 @@ import (
 	"github.com/ChausseBenjamin/rafta/internal/auth"
 	"github.com/ChausseBenjamin/rafta/internal/db"
 	"github.com/ChausseBenjamin/rafta/internal/intercept"
-	"github.com/ChausseBenjamin/rafta/internal/secrets"
 	"github.com/ChausseBenjamin/rafta/internal/util"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
 	"google.golang.org/grpc"
@@ -53,12 +52,7 @@ func NewAuthServer(ps *protoServer, authMgr *auth.AuthManager) *authServer {
 
 // Setup creates a new gRPC with both services
 // and starts listening on the given port
-func Setup(ctx context.Context, store *db.Store, vault secrets.SecretVault, cfg *util.ConfigStore) (*grpc.Server, *auth.AuthManager, error) {
-	authMgr, err := auth.NewManager(vault, store.DB)
-	if err != nil {
-		return nil, nil, err
-	}
-
+func Setup(ctx context.Context, store *db.Store, authMgr *auth.AuthManager, cfg *util.ConfigStore) (*grpc.Server, *auth.AuthManager, error) {
 	slog.DebugContext(ctx, "Configuring gRPC server")
 	server := grpc.NewServer(grpc.ChainUnaryInterceptor(
 		intercept.Tagging,

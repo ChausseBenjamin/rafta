@@ -117,5 +117,5 @@ func (s *adminServer) GetUser(ctx context.Context, uuid *m.UUID) (*m.User, error
 }
 
 func (s *adminServer) GetUserTasks(context.Context, *m.UUID) (*m.TaskList, error) {
-	return nil, nil
+	return nil, status.Error(codes.Unimplemented, "Server under construction still...")
 }

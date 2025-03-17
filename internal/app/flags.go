@@ -28,6 +28,8 @@ const (
 	FlagSecretsPath      = "secrets-path"
 	FlagMinPasswdLen     = "min-password-length"
 	FlagMaxPasswdLen     = "max-password-length"
+	FlagAccessTokenTTL   = "access-token-time-to-live"
+	FlagRefreshTokenTTL  = "refresh-token-time-to-live"
 )
 
 func flags() []cli.Flag {
@@ -92,13 +94,13 @@ func flags() []cli.Flag {
 			Usage:   "Directory containing necessary secrets (ca_certs, private keys, etc...)",
 			Sources: cli.EnvVars("SECRETS_PATH"),
 		},
-		&cli.UintFlag{ // TODO: uttilize MAX_USERS
+		&cli.UintFlag{
 			Name:    FlagMaxUsers,
 			Value:   25,
 			Usage:   "Maximum number of users that can get created without admin intervention",
 			Sources: cli.EnvVars("MAX_USERS"),
 		},
-		&cli.BoolFlag{ // TODO: uttilize DISABLE_PUBLIC_SIGNUP
+		&cli.BoolFlag{
 			Name:    FlagDisablePubSignup,
 			Usage:   "Deactivate public (non admin-based) signups",
 			Sources: cli.EnvVars("DISABLE_PUBLIC_SIGNUP"),
@@ -114,6 +116,18 @@ func flags() []cli.Flag {
 			Usage:   "Minimum password length the server can accept",
 			Value:   8,
 			Sources: cli.EnvVars("MIN_PASSWORD_LENGTH"),
+		},
+		&cli.DurationFlag{
+			Name:    FlagAccessTokenTTL,
+			Usage:   "Duration of an access json web token (JWT)",
+			Value:   15 * time.Minute,
+			Sources: cli.EnvVars("JWT_ACCESS_TTL"),
+		},
+		&cli.DurationFlag{
+			Name:    FlagRefreshTokenTTL,
+			Usage:   "Duration of a refresh json web token (JWT)",
+			Value:   24 * time.Hour,
+			Sources: cli.EnvVars("JWT_REFRESH_TTL"),
 		}, // }}}
 	}
 }
