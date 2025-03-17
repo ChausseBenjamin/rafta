@@ -10,9 +10,9 @@ message UUID {
 }
 
 enum TaskState {
-  UNDEFINED   = 0;
+  UNSPECIFIED = 0;
   PENDING     = 1;
-  IN_PROGRESS = 2;
+  ONGOING     = 2;
   DONE        = 3;
   BLOCKED     = 4;
 }
