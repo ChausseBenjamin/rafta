@@ -24,34 +24,31 @@ type protoServer struct {
 }
 
 type raftaServer struct {
-	store *db.Store
-	cfg   *util.ConfigStore
+	*protoServer
 	m.UnimplementedRaftaServer
 }
 
 type adminServer struct {
-	store *db.Store
-	cfg   *util.ConfigStore
+	*protoServer
 	m.UnimplementedAdminServer
 }
 
 type authServer struct {
-	store   *db.Store
-	authMgr *auth.AuthManager // To issue tokens
-	cfg     *util.ConfigStore
+	authMgr *auth.AuthManager
+	*protoServer
 	m.UnimplementedAuthServer
 }
 
-func NewRaftaServer(store *db.Store, cfg *util.ConfigStore) *raftaServer {
-	return &raftaServer{store: store, cfg: cfg}
+func NewRaftaServer(ps *protoServer) *raftaServer {
+	return &raftaServer{protoServer: ps}
 }
 
-func NewAdminServer(store *db.Store, cfg *util.ConfigStore) *adminServer {
-	return &adminServer{store: store, cfg: cfg}
+func NewAdminServer(ps *protoServer) *adminServer {
+	return &adminServer{protoServer: ps}
 }
 
-func NewAuthServer(store *db.Store, authMgr *auth.AuthManager, cfg *util.ConfigStore) *authServer {
-	return &authServer{store: store, authMgr: authMgr, cfg: cfg}
+func NewAuthServer(ps *protoServer, authMgr *auth.AuthManager) *authServer {
+	return &authServer{protoServer: ps, authMgr: authMgr}
 }
 
 // Setup creates a new gRPC with both services
@@ -68,10 +65,12 @@ func Setup(ctx context.Context, store *db.Store, vault secrets.SecretVault, cfg 
 		authMgr.Authenticating(),
 	))
 
+	ps := &protoServer{cfg: cfg, store: store}
+
 	reflection.Register(server)
-	m.RegisterAuthServer(server, NewAuthServer(store, authMgr, cfg))
-	m.RegisterAdminServer(server, NewAdminServer(store, cfg))
-	m.RegisterRaftaServer(server, NewRaftaServer(store, cfg))
+	m.RegisterAuthServer(server, NewAuthServer(ps, authMgr))
+	m.RegisterAdminServer(server, NewAdminServer(ps))
+	m.RegisterRaftaServer(server, NewRaftaServer(ps))
 
 	return server, authMgr, nil
 }

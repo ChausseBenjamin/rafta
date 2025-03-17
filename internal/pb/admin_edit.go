@@ -55,13 +55,12 @@ func (s *adminServer) UpdateUser(ctx context.Context, user *m.User) (*emptypb.Em
 			"User does not have the authority to update another user",
 		)
 	}
-	ps := &protoServer{store: s.store, cfg: s.cfg}
 
-	if err := ps.checkUserExistence(ctx, user.Id.Value, "update"); err != nil {
+	if err := s.checkUserExistence(ctx, user.Id.Value, "update"); err != nil {
 		return nil, err
 	}
 
-	if err := ps.checkEmailCollision(ctx, user.Data.Email, user.Id.Value, "update"); err != nil {
+	if err := s.checkEmailCollision(ctx, user.Data.Email, user.Id.Value, "update"); err != nil {
 		return nil, err
 	}
 
@@ -96,8 +95,13 @@ func (s *adminServer) UpdateUser(ctx context.Context, user *m.User) (*emptypb.Em
 	return &emptypb.Empty{}, nil
 }
 
-func (s *adminServer) CreateUser(ctx context.Context, user *m.UserCredsRequest) (*emptypb.Empty, error) {
-	return nil, nil
+func (s *adminServer) CreateUser(ctx context.Context, info *m.UserCredsRequest) (*emptypb.Empty, error) {
+	_, err := s.newUser(ctx, info)
+	if err != nil {
+		return nil, err
+	}
+
+	return &emptypb.Empty{}, nil
 }
 
 func (s *adminServer) UpdateCredentials(ctx context.Context, user *m.UserCredsRequest) (*emptypb.Empty, error) {

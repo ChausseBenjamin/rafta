@@ -99,8 +99,7 @@ func (s *authServer) Signup(ctx context.Context, info *m.UserCredsRequest) (*m.S
 		return nil, status.Errorf(codes.FailedPrecondition, "The server is not accepting new signups at this time")
 	}
 
-	ps := &protoServer{cfg: s.cfg, store: s.store}
-	user, err := ps.newUser(ctx, info)
+	user, err := s.newUser(ctx, info)
 	if err != nil {
 		return nil, err
 	}
