@@ -20,6 +20,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const maxUUIDGenAttempts = 5
+
 // getUserRoles is meant to be used when creating JWT tokens.
 // Since login and signup only provide an email as an identifier, role
 // information has to be fetched from the database.
@@ -95,12 +97,42 @@ func (s *protoServer) newUser(ctx context.Context, info *m.UserCredsRequest) (*m
 		}
 	}
 
-	uuid, err := uuid.GenerateUUID()
-	if err != nil {
-		slog.ErrorContext(ctx, "Failed to generate UUID", logging.ErrKey, err)
-		return nil, status.Errorf(codes.Internal,
-			"Couldn't generate a unique ID for the new user",
-		)
+	var (
+		exists   bool = true
+		attempts int
+		id       string
+		err      error
+	)
+	uniqueCheck := s.store.Common[db.AssertUserExists]
+	for !exists {
+		attempts++
+		id, err = uuid.GenerateUUID()
+		if err != nil {
+			slog.ErrorContext(ctx, "Failed to generate UUID", logging.ErrKey, err)
+			return nil, status.Errorf(codes.Internal,
+				"Couldn't generate a unique ID for the new user",
+			)
+		}
+		err := uniqueCheck.QueryRowContext(ctx, id).Scan(&exists)
+		if err != nil {
+			slog.ErrorContext(ctx, "Failed to ensure the generated UUID was unique",
+				"uuid", id,
+				logging.ErrKey, err,
+			)
+			return nil, status.Error(codes.Internal,
+				"Failed to generate a valid UUID",
+			)
+		}
+		if attempts >= maxUUIDGenAttempts {
+			slog.ErrorContext(ctx,
+				"Max uuid generation attemps reached during signup",
+				"attempts", maxUUIDGenAttempts,
+			)
+			return nil, status.Errorf(codes.Internal,
+				"Max uuid generation attemps reached",
+			)
+		}
+
 	}
 
 	hash, err := auth.GenerateHash(info.UserSecret)
@@ -115,8 +147,8 @@ func (s *protoServer) newUser(ctx context.Context, info *m.UserCredsRequest) (*m
 	insertUser := tx.StmtContext(ctx, s.store.Common[db.CreateUser])
 	insertSecret := tx.StmtContext(ctx, s.store.Common[db.CreateUserSecret])
 
-	_, errInsertUser := insertUser.ExecContext(ctx, uuid, info.User.Name, info.User.Email)
-	_, errInsertSecret := insertSecret.ExecContext(ctx, uuid, hash)
+	_, errInsertUser := insertUser.ExecContext(ctx, id, info.User.Name, info.User.Email)
+	_, errInsertSecret := insertSecret.ExecContext(ctx, id, hash)
 
 	if err := errors.Join(errTx, errInsertUser, errInsertSecret); err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
@@ -133,7 +165,7 @@ func (s *protoServer) newUser(ctx context.Context, info *m.UserCredsRequest) (*m
 		return nil, status.Errorf(codes.Internal, "Failed to insert new user into the database")
 	}
 	return &m.User{
-		Id:   &m.UUID{Value: uuid},
+		Id:   &m.UUID{Value: id},
 		Data: info.User,
 	}, nil
 }
