@@ -19,6 +19,8 @@ env_vars=$(cat << EOF
   DATABASE_PATH=$localruntime/store.db
   GRACEFUL_TIMEOUT=200ms
   SECRETS_PATH=$localsecrets
+  JWT_ACCESS_TTL=720h
+  JWT_REFRESH_TTL=720h
 EOF
 )
 
