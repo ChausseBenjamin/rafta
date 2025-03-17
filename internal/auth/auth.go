@@ -24,11 +24,9 @@ import (
 
 const (
 	// TODO: Make these configurable through flags/env variables
-	issuer               = "rafta-server"
-	refreshTokenDuration = 24 * time.Hour
-	accessTokenDuration  = 20 * time.Hour // for ease of testing
-	accessTokenName      = "access"
-	refreshTokenName     = "refresh"
+	issuer           = "rafta-server"
+	accessTokenName  = "access"
+	refreshTokenName = "refresh"
 )
 
 var (
@@ -43,6 +41,7 @@ type AuthManager struct {
 	privKey     secrets.Secret
 	db          *sql.DB
 	revokeCheck *sql.Stmt
+	cfg         *util.ConfigStore
 }
 
 type Claims struct {
@@ -158,7 +157,7 @@ func (a *AuthManager) Issue(userID string, roles []string) (string, string, erro
 			Issuer:    issuer,
 			Subject:   userID,
 			Audience:  []string{"your-app-audience"},
-			ExpiresAt: jwt.NewNumericDate(now.Add(accessTokenDuration)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(a.cfg.JWTAccessTTL)),
 			IssuedAt:  jwt.NewNumericDate(now),
 			ID:        accessID,
 		},
@@ -178,7 +177,7 @@ func (a *AuthManager) Issue(userID string, roles []string) (string, string, erro
 		Type:   refreshTokenName,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
-			ExpiresAt: jwt.NewNumericDate(now.Add(refreshTokenDuration)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(a.cfg.JWTRefreshTTL)),
 			IssuedAt:  jwt.NewNumericDate(now),
 			ID:        refreshID,
 		},
@@ -194,7 +193,7 @@ func (a *AuthManager) Issue(userID string, roles []string) (string, string, erro
 	return accessTokenString, refreshTokenString, nil
 }
 
-func NewManager(vault secrets.SecretVault, db *sql.DB) (*AuthManager, error) {
+func NewManager(vault secrets.SecretVault, db *sql.DB, cfg *util.ConfigStore) (*AuthManager, error) {
 	pubkey, pubErr := vault.Get("server-pubkey")
 	privkey, privErr := vault.Get("server-privkey")
 	if pubErr != nil || privErr != nil {
@@ -232,6 +231,7 @@ func NewManager(vault secrets.SecretVault, db *sql.DB) (*AuthManager, error) {
 		pubKey:      pubkey,
 		privKey:     privkey,
 		revokeCheck: stmt,
+		cfg:         cfg,
 	}, nil
 }
 

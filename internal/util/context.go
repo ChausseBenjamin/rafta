@@ -3,6 +3,7 @@ package util
 import (
 	"context"
 	"log/slog"
+	"time"
 )
 
 type ContextKey uint8
@@ -21,6 +22,8 @@ type ConfigStore struct {
 	MaxUsers      int
 	MinPasswdLen  int
 	MaxPasswdLen  int
+	JWTAccessTTL  time.Duration
+	JWTRefreshTTL time.Duration
 }
 
 func GetFromContext[T any](ctx context.Context, key any) *T {

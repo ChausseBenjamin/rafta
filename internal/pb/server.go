@@ -8,7 +8,6 @@ import (
 	"github.com/ChausseBenjamin/rafta/internal/auth"
 	"github.com/ChausseBenjamin/rafta/internal/db"
 	"github.com/ChausseBenjamin/rafta/internal/intercept"
-	"github.com/ChausseBenjamin/rafta/internal/secrets"
 	"github.com/ChausseBenjamin/rafta/internal/util"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
 	"google.golang.org/grpc"
@@ -17,55 +16,55 @@ import (
 
 var ErrOutOfBoundsPort = errors.New("given port is out of bounds (1024-65535)")
 
-type RaftaServer struct {
+// used to simplify wrapping for certain tasks
+type protoServer struct {
 	store *db.Store
 	cfg   *util.ConfigStore
+}
+
+type raftaServer struct {
+	*protoServer
 	m.UnimplementedRaftaServer
 }
 
-type AdminServer struct {
-	store *db.Store
-	cfg   *util.ConfigStore
+type adminServer struct {
+	*protoServer
 	m.UnimplementedAdminServer
 }
 
-type AuthServer struct {
-	store   *db.Store
-	authMgr *auth.AuthManager // To issue tokens
-	cfg     *util.ConfigStore
+type authServer struct {
+	authMgr *auth.AuthManager
+	*protoServer
 	m.UnimplementedAuthServer
 }
 
-func NewRaftaServer(store *db.Store, cfg *util.ConfigStore) *RaftaServer {
-	return &RaftaServer{store: store, cfg: cfg}
+func NewRaftaServer(ps *protoServer) *raftaServer {
+	return &raftaServer{protoServer: ps}
 }
 
-func NewAdminServer(store *db.Store, cfg *util.ConfigStore) *AdminServer {
-	return &AdminServer{store: store, cfg: cfg}
+func NewAdminServer(ps *protoServer) *adminServer {
+	return &adminServer{protoServer: ps}
 }
 
-func NewAuthServer(store *db.Store, authMgr *auth.AuthManager, cfg *util.ConfigStore) *AuthServer {
-	return &AuthServer{store: store, authMgr: authMgr, cfg: cfg}
+func NewAuthServer(ps *protoServer, authMgr *auth.AuthManager) *authServer {
+	return &authServer{protoServer: ps, authMgr: authMgr}
 }
 
 // Setup creates a new gRPC with both services
 // and starts listening on the given port
-func Setup(ctx context.Context, store *db.Store, vault secrets.SecretVault, cfg *util.ConfigStore) (*grpc.Server, *auth.AuthManager, error) {
-	authMgr, err := auth.NewManager(vault, store.DB)
-	if err != nil {
-		return nil, nil, err
-	}
-
+func Setup(ctx context.Context, store *db.Store, authMgr *auth.AuthManager, cfg *util.ConfigStore) (*grpc.Server, *auth.AuthManager, error) {
 	slog.DebugContext(ctx, "Configuring gRPC server")
 	server := grpc.NewServer(grpc.ChainUnaryInterceptor(
 		intercept.Tagging,
 		authMgr.Authenticating(),
 	))
 
+	ps := &protoServer{cfg: cfg, store: store}
+
 	reflection.Register(server)
-	m.RegisterAuthServer(server, NewAuthServer(store, authMgr, cfg))
-	m.RegisterAdminServer(server, NewAdminServer(store, cfg))
-	m.RegisterRaftaServer(server, NewRaftaServer(store, cfg))
+	m.RegisterAuthServer(server, NewAuthServer(ps, authMgr))
+	m.RegisterAdminServer(server, NewAdminServer(ps))
+	m.RegisterRaftaServer(server, NewRaftaServer(ps))
 
 	return server, authMgr, nil
 }

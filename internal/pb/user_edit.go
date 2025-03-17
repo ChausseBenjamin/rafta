@@ -2,33 +2,68 @@ package pb
 
 import (
 	"context"
+	"log/slog"
 
-	"github.com/ChausseBenjamin/rafta/internal/util"
+	"github.com/ChausseBenjamin/rafta/internal/auth"
+	"github.com/ChausseBenjamin/rafta/internal/db"
+	"github.com/ChausseBenjamin/rafta/internal/logging"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-func (s *RaftaServer) NewUser(ctx context.Context, val *m.UserData) (*m.User, error) {
-	ctx = context.WithValue(ctx, util.ProtoMethodKey, "NewUser")
-	return nil, nil
+func (s *raftaServer) UpdateUserInfo(ctx context.Context, val *m.User) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "Server still under construction...")
 }
 
-func (s *RaftaServer) UpdateUserInfo(ctx context.Context, val *m.User) (*emptypb.Empty, error) {
-	ctx = context.WithValue(ctx, util.ProtoMethodKey, "UpdateUserInfo")
-	return nil, nil
+func (s *raftaServer) DeleteUser(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "Server still under construction...")
 }
 
-func (s *RaftaServer) DeleteUser(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
-	ctx = context.WithValue(ctx, util.ProtoMethodKey, "DeleteUser")
-	return nil, nil
+func (s *raftaServer) ChangeCredentials(ctx context.Context, psswd *m.PasswdMessage) (*emptypb.Empty, error) {
+	creds, err := getCreds(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx,
+			"Failed to assert identity passed authentication",
+			logging.ErrKey, err,
+		)
+		return nil, status.Error(codes.Internal,
+			"Could not establish identity after authentication",
+		)
+	}
+
+	if err := s.validatePasswd(psswd.Secret); err != nil {
+		return nil, err
+	}
+
+	hash, err := auth.GenerateHash(psswd.Secret)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to hash user password", logging.ErrKey, err)
+		return nil, status.Errorf(codes.Internal,
+			"Couldn't create a hash for user authentication",
+		)
+	}
+
+	stmt := s.store.Common[db.UpdateUserPasswd]
+	_, err = stmt.ExecContext(ctx, hash, creds.UserID)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to change user password",
+			"uuid", creds.UserID,
+			logging.ErrKey, err,
+		)
+		return nil, status.Errorf(codes.Internal,
+			"Failed to update password for user '%s'", creds.UserID,
+		)
+	}
+
+	return &emptypb.Empty{}, nil
 }
 
-func (s *RaftaServer) DeleteTask(ctx context.Context, val *m.UUID) (*emptypb.Empty, error) {
-	ctx = context.WithValue(ctx, util.ProtoMethodKey, "DeleteTask")
-	return nil, nil
+func (s *raftaServer) DeleteTask(ctx context.Context, val *m.UUID) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "Server still under construction...")
 }
 
-func (s *RaftaServer) CreateTask(ctx context.Context, val *m.TaskData) (*m.Task, error) {
-	ctx = context.WithValue(ctx, util.ProtoMethodKey, "CreateTask")
-	return nil, nil
+func (s *raftaServer) CreateTask(ctx context.Context, val *m.TaskData) (*m.Task, error) {
+	return nil, status.Error(codes.Unimplemented, "Server still under construction...")
 }

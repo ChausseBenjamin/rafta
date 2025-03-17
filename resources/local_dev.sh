@@ -3,6 +3,8 @@
 localsecrets=".secrets"
 localruntime=".runtime"
 
+binpath="build/rafta"
+
 mkdir -p "$localsecrets" || exit 1
 [ -f "$localsecrets/.gitignore" ] || echo '*' > "$localsecrets/.gitignore"
 
@@ -17,12 +19,17 @@ env_vars=$(cat << EOF
   DATABASE_PATH=$localruntime/store.db
   GRACEFUL_TIMEOUT=200ms
   SECRETS_PATH=$localsecrets
+  JWT_ACCESS_TTL=720h
+  JWT_REFRESH_TTL=720h
 EOF
 )
 
 case "$1" in
   --print-config)
     echo "$env_vars"
+    ;;
+  --bin)
+    clear && shift && env $env_vars "$binpath" $@
     ;;
   *)
     clear && env $env_vars go run . $@

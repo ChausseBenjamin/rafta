@@ -117,6 +117,8 @@ func initApp(ctx context.Context, cmd *cli.Command) (*grpc.Server, *db.Store, *a
 		MaxUsers:      int(cmd.Uint(FlagMaxUsers)),
 		MinPasswdLen:  int(cmd.Uint(FlagMinPasswdLen)),
 		MaxPasswdLen:  int(cmd.Uint(FlagMaxPasswdLen)),
+		JWTAccessTTL:  cmd.Duration(FlagAccessTokenTTL),
+		JWTRefreshTTL: cmd.Duration(FlagRefreshTokenTTL),
 	}
 
 	vault, err := secrets.NewDirVault(cmd.String(FlagSecretsPath))
@@ -130,7 +132,12 @@ func initApp(ctx context.Context, cmd *cli.Command) (*grpc.Server, *db.Store, *a
 		return nil, nil, nil, err
 	}
 
-	server, authMgr, err := pb.Setup(ctx, store, vault, globalConf)
+	authMgr, err := auth.NewManager(vault, store.DB, globalConf)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	server, authMgr, err := pb.Setup(ctx, store, authMgr, globalConf)
 	if err != nil {
 		slog.ErrorContext(ctx, "Unable to setup gRPC server", logging.ErrKey, err)
 		return nil, nil, nil, err

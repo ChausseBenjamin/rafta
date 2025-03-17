@@ -1,7 +1,7 @@
 BUILD_DIR=./build
 APP=rafta
 
-all: setup codegen clean compile
+all: setup codegen clean protoset compile
 
 setup:
 	git submodule update --init
@@ -21,17 +21,17 @@ protoset:
 	protoc \
 		--proto_path=resources \
 		--proto_path=external \
-		--descriptor_set_out=$(BUILD_DIR)/protoset/schema.protoset \
+		--descriptor_set_out=$(BUILD_DIR)/schema.protoset \
 		--include_imports \
 		resources/schema.proto
-
-clean:
-	rm -rf $(BUILD_DIR) || exit 1
 
 compile:
 	mkdir -p $(BUILD_DIR) || exit 1
 	CGO_ENABLED=0 go run ./internal/autogen > $(BUILD_DIR)/$(APP).1
 	CGO_ENABLED=0 go build -o $(BUILD_DIR)/$(APP) .
+
+clean:
+	rm -rf $(BUILD_DIR) || exit 1
 
 .PHONY: run
 run:

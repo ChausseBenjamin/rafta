@@ -91,17 +91,12 @@ message JWT {
   string refresh = 2;
 }
 
-message Credentials {
-  string email  = 1;
-  string secret = 2;
-}
-
 message LoginResponse {
   User user  = 1;
   JWT tokens = 2;
 }
 
-message UserCredsRequest {
+message UserSignupRequest {
   UserData user     = 1;
   string userSecret = 2;
 }
@@ -113,6 +108,15 @@ message SignupResponse {
 
 message RefreshRequest {
   string refreshToken = 1;
+}
+
+message ChangePasswdRequest {
+	UUID   id     = 1;
+	string secret = 2;
+}
+
+message PasswdMessage {
+	string secret = 1;
 }
 
 // Accessible to all users only once authenticated
@@ -128,7 +132,7 @@ service Rafta {
 	// User Manipulation
 	rpc UpdateUserInfo(User) returns (google.protobuf.Empty);
 	rpc DeleteUser(google.protobuf.Empty) returns (google.protobuf.Empty);
-	rpc ChangeCredentials(Credentials) returns (google.protobuf.Empty);
+	rpc ChangeCredentials(PasswdMessage) returns (google.protobuf.Empty);
 
   // Task Manipulation
   rpc DeleteTask(UUID) returns (google.protobuf.Empty);
@@ -146,13 +150,13 @@ service Admin {
   // User Manipulation
   rpc DeleteUser(UUID) returns (google.protobuf.Empty);
   rpc UpdateUser(User) returns (google.protobuf.Empty);
-  rpc CreateUser(UserCredsRequest) returns (google.protobuf.Empty);
-	rpc UpdateCredentials(UserCredsRequest) returns (google.protobuf.Empty);
+  rpc CreateUser(UserSignupRequest) returns (google.protobuf.Empty);
+	rpc UpdateCredentials(ChangePasswdRequest) returns (google.protobuf.Empty);
 }
 
 // Used only for signups and logins before a jwt is issued
 service Auth {
-	rpc Signup(UserCredsRequest) returns (SignupResponse);
+	rpc Signup(UserSignupRequest) returns (SignupResponse);
 	// Login uses a Basic token in the header
 	// (`Authorization: Basic <base64>clientID:clientSecret</base64>`)
   rpc Login(google.protobuf.Empty) returns (LoginResponse);

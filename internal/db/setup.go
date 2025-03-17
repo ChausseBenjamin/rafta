@@ -22,14 +22,26 @@ var (
 	ErrTableStructure       = errors.New("table structure does not match expected schema")
 )
 
+// Store contains both a database and a list all prepared statements the
+// server needs to use at runtime.
+// The benefits of centralizing all statements are twofold:
+//
+//  1. It's easy to have an overview of how data gets queried
+//  2. Since statements are sanitized to avoid SQL injection, this security is
+//     inherent to all calls made to the database
+//
+// The only reason DB is actually needed here is for the auth package (which
+// would cause a circular dependency) and the use of transactions where it
+// can be useful to dismiss multiple statements at once if something
+// unexpected happens.
 type Store struct {
 	DB     *sql.DB
 	Common []*sql.Stmt
 }
 
 func new(db *sql.DB) (*Store, error) {
-	lst := make([]*sql.Stmt, len(commonTransactions))
-	for _, common := range commonTransactions {
+	lst := make([]*sql.Stmt, len(commonStatements))
+	for _, common := range commonStatements {
 		stmt, err := db.Prepare(common.Cmd)
 		if err != nil {
 			return nil, err
@@ -233,7 +245,7 @@ func fetchTableSQL(db *sql.DB, table string) (string, error) {
 func backupFile(ctx context.Context, path string) {
 	backupPath := path + ".bak"
 	if _, err := os.Stat(backupPath); err == nil {
-		backupPath = fmt.Sprintf("%s-%s.bak", path, time.Now().Format(time.RFC3339))
+		backupPath = fmt.Sprintf("%s-%s.bak", path, time.Now().UTC().Format(time.RFC3339))
 	}
 	if err := os.Rename(path, backupPath); err != nil {
 		slog.ErrorContext(ctx, "failed to backup file",
