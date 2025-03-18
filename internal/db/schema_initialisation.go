@@ -40,6 +40,8 @@ var schemaDefinitions = [...]struct {
 			do TIMESTAMP,
 			recurrencePattern TEXT,
 			recurrenceEnabled BOOLEAN NOT NULL DEFAULT FALSE,
+			createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			owner TEXT NOT NULL,
 			FOREIGN KEY (owner) REFERENCES Users(userID) ON DELETE CASCADE
 		);`,

@@ -148,14 +148,14 @@ func (s *protoServer) newUser(ctx context.Context, req *m.UserSignupRequest) (*m
 	}, nil
 }
 
-func (s *protoServer) generateUniqueUUID(ctx context.Context, uniqueCheck *sql.Stmt) (string, error) {
+func (s *protoServer) generateUniqueUUID(ctx context.Context, existsCheck *sql.Stmt) (string, error) {
 	var (
-		exists   bool = true
+		exists   bool = true // we assume the generated uuid will already exist
 		attempts int
 		id       string
 		err      error
 	)
-	for !exists {
+	for exists {
 		attempts++
 		id, err = uuid.GenerateUUID()
 		if err != nil {
@@ -164,7 +164,7 @@ func (s *protoServer) generateUniqueUUID(ctx context.Context, uniqueCheck *sql.S
 				"Couldn't generate a unique ID",
 			)
 		}
-		err := uniqueCheck.QueryRowContext(ctx, id).Scan(&exists)
+		err := existsCheck.QueryRowContext(ctx, id).Scan(&exists)
 		if err != nil {
 			slog.ErrorContext(ctx, "Failed to ensure the generated UUID was unique",
 				"uuid", id,
