@@ -11,7 +11,7 @@ import (
 )
 
 // gRPC interceptor to tag requests with a unique identifier and other unique attributes to ease logging
-func Tagging(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func Tagging(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	id, err := uuid.GenerateUUID()
 	if err != nil {
 		slog.ErrorContext(ctx, "Unable to generate UUID for request", logging.ErrKey, err)
