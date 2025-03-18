@@ -34,7 +34,7 @@ func (s *raftaServer) CreateTask(ctx context.Context, task *m.TaskData) (*m.Task
 	}
 	defer tx.Rollback()
 
-	now := time.Now()
+	now := time.Now().UTC()
 
 	_, err = tx.Stmt(s.store.Common[db.CreateTask]).ExecContext(ctx,
 		taskID,
