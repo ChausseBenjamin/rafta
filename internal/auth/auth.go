@@ -115,14 +115,14 @@ func (a *AuthManager) handleBearerAuth(ctx context.Context, req any, handler grp
 	}
 
 	if tokenWithClaims, ok := token.Claims.(*Claims); !ok {
-		slog.Warn("Unable to extract custom claims from JWT")
+		slog.WarnContext(ctx, "Unable to extract custom claims from JWT")
 		return handler(ctx, req)
 	} else {
 		revoked := false
 		row := a.revokeCheck.QueryRowContext(ctx, tokenWithClaims.ID)
 		err := row.Scan(&revoked)
 		if err != nil {
-			slog.Error("failed to ensure provided token is not revoked",
+			slog.ErrorContext(ctx, "failed to ensure provided token is not revoked",
 				logging.ErrKey, err,
 			)
 			return nil, status.Error(

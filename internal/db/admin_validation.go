@@ -44,7 +44,7 @@ func validateAdmin(ctx context.Context, db *sql.DB) error {
 			tx.Rollback()
 			return err
 		}
-		slog.Info("ADMIN role created")
+		slog.InfoContext(ctx, "ADMIN role created")
 	}
 
 	// Check the count of users with the ADMIN role
@@ -119,7 +119,7 @@ func validateAdmin(ctx context.Context, db *sql.DB) error {
 			return err
 		}
 
-		slog.Info("Initialized new admin user")
+		slog.InfoContext(ctx, "Initialized new admin user")
 	}
 
 	// Commit transaction

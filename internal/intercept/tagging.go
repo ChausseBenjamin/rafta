@@ -14,7 +14,7 @@ import (
 func Tagging(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	id, err := uuid.GenerateUUID()
 	if err != nil {
-		slog.Error("Unable to generate UUID for request", logging.ErrKey, err)
+		slog.ErrorContext(ctx, "Unable to generate UUID for request", logging.ErrKey, err)
 	}
 	ctx = context.WithValue(ctx, util.ReqIDKey, id)
 	ctx = context.WithValue(ctx, util.ProtoServerKey, info.Server)
