@@ -24,6 +24,7 @@ const (
 	GetUserCount
 	GetUserIDFromEmail
 	GetUserRoles
+	GetUserTask
 	GetUserTasks
 	GetUserWithSecret
 	RevokeToken
@@ -113,6 +114,20 @@ var commonStatements = [...]struct {
 	{
 		Name: GetUserRoles,
 		Cmd:  `SELECT role FROM UserRoles WHERE userID = ?`,
+	},
+	{
+		Name: GetUserTask,
+		Cmd: `SELECT
+						title,
+						priority,
+						description,
+						due,
+						do,
+						recurrencePattern,
+						recurrenceEnabled,
+						createdAt,
+						updatedAt
+					FROM Tasks WHERE owner= ? AND taskID = ?`,
 	},
 	{
 		Name: GetUserTasks,
