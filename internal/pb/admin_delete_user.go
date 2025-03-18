@@ -31,11 +31,13 @@ func (s *adminServer) DeleteUser(ctx context.Context, id *m.UUID) (*emptypb.Empt
 			logging.ErrKey, err,
 			db.RespMsgKey, resp,
 		)
-		return nil, err
+		return nil, status.Errorf(codes.Internal,
+			"An error occured deleting user '%s'", id.Value,
+		)
 	}
 	if i, err := resp.RowsAffected(); i == 0 && err == nil {
 		return nil, status.Errorf(codes.NotFound,
-			"User %s does not exist in the database", id.Value,
+			"User '%s' does not exist in the database", id.Value,
 		)
 	}
 	slog.InfoContext(ctx, "deleted user", db.RespMsgKey, resp)
