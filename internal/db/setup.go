@@ -81,7 +81,8 @@ func Setup(ctx context.Context, path string) (*Store, error) {
 
 	// If file does not exist, generate a new DB.
 	if _, statErr := os.Stat(path); statErr != nil {
-		_, genErr := genDB(ctx, path)
+		var genErr error
+		db, genErr = genDB(ctx, path)
 		if genErr != nil {
 			return nil, genErr
 		}
