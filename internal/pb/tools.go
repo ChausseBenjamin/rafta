@@ -189,8 +189,7 @@ func (s *protoServer) generateUniqueUUID(ctx context.Context, existsCheck *sql.S
 
 // checkUserExistence helps preventing errors if an admin tries to update/delete a non-existent user
 func (s *protoServer) checkUserExistence(ctx context.Context, userID, action string) error {
-	assertExistence := s.store.Common[db.AssertUserExists]
-	row := assertExistence.QueryRowContext(ctx, userID)
+	row := s.store.Common[db.AssertUserExists].QueryRowContext(ctx, userID)
 	userExists := false
 	if err := row.Scan(&userExists); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
@@ -216,8 +215,7 @@ func (s *protoServer) checkUserExistence(ctx context.Context, userID, action str
 
 // checkEmailCollision helps avoid two users getting assigned the same email/username on the server
 func (s *protoServer) checkEmailCollision(ctx context.Context, email, userID, action string) error {
-	checkEmailCollision := s.store.Common[db.GetUserIDFromEmail]
-	rows, err := checkEmailCollision.QueryContext(ctx, email)
+	rows, err := s.store.Common[db.GetUserIDFromEmail].QueryContext(ctx, email)
 	if err != nil {
 		slog.WarnContext(ctx, "Failed to confirm uniqueness of email while updating the user")
 		return status.Error(codes.Internal, "Failed to confirm uniqueness of email")
