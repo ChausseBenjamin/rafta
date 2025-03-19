@@ -10,5 +10,10 @@ import (
 )
 
 func (s *raftaServer) DeleteTask(ctx context.Context, val *m.UUID) (*emptypb.Empty, error) {
+	creds, err := getCreds(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	return nil, status.Error(codes.Unimplemented, "Server still under construction...")
 }

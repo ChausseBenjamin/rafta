@@ -15,8 +15,10 @@ const (
 	CreateTaskTag
 	CreateUser
 	CreateUserSecret
+	DeleteTask
 	DeleteTaskTag
 	DeleteUser
+	DeleteUserTask
 	GetAllUsers
 	GetTagID
 	GetTaskTags
@@ -77,12 +79,20 @@ var commonStatements = [...]struct {
 		Cmd:  `INSERT INTO UserSecrets (userID, saltAndHash) VALUES (?, ?)`,
 	},
 	{
+		Name: DeleteTask,
+		Cmd:  `DELETE FROM Tasks WHERE taskID = ?`,
+	},
+	{
 		Name: DeleteTaskTag,
 		Cmd:  `DELETE FROM TaskTags WHERE taskID = ? AND tagID = ?`,
 	},
 	{
 		Name: DeleteUser,
 		Cmd:  `DELETE FROM Users WHERE userID = ?`,
+	},
+	{
+		Name: DeleteUserTask,
+		Cmd:  `DELETE FROM Tasks WHERE taskID = ? AND owner = ?`,
 	},
 	{
 		Name: GetAllUsers,
