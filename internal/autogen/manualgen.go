@@ -25,7 +25,9 @@ func main() {
 
 	man, err := docs.ToManWithSection(a, 1)
 	if err != nil {
-		slog.Error("failed to generate man page", logging.ErrKey, err)
+		slog.Error("failed to generate man page",
+			slog.Any(logging.ErrKey, err),
+		)
 		os.Exit(1)
 	}
 	os.Stdout.Write([]byte(man))

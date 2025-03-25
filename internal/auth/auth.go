@@ -1,3 +1,4 @@
+// auth handles everything related to JWT.
 package auth
 
 import (
@@ -11,43 +12,46 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ChausseBenjamin/rafta/internal/database"
 	"github.com/ChausseBenjamin/rafta/internal/logging"
+	"github.com/ChausseBenjamin/rafta/internal/sec"
 	"github.com/ChausseBenjamin/rafta/internal/secrets"
 	"github.com/ChausseBenjamin/rafta/internal/util"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/hashicorp/go-uuid"
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
+type tokenType string
+
 const (
 	// TODO: Make these configurable through flags/env variables
-	issuer           = "rafta-server"
-	accessTokenName  = "access"
-	refreshTokenName = "refresh"
+	issuer                     = "rafta-server"
+	AccessTokenType  tokenType = "access"
+	RefreshTokenType tokenType = "refresh"
+	BasicTokenType   tokenType = "basic"
 )
 
 var (
 	errTokenAlg     = errors.New("Received token uses an unsupported signing method")
 	privKeyStoreErr = errors.New("failed to store private key in vault")
 	pubKeyStoreErr  = errors.New("failed to store public key in vault")
-	uuidErr         = errors.New("Failed to generate a UUID for a token")
 )
 
 type AuthManager struct {
-	pubKey      secrets.Secret
-	privKey     secrets.Secret
-	db          *sql.DB
-	revokeCheck *sql.Stmt
-	cfg         *util.ConfigStore
+	pubKey  secrets.Secret
+	privKey secrets.Secret
+	db      *database.Queries
+	cfg     *util.ConfigStore
 }
 
 type Claims struct {
-	UserID string   `json:"uuid"`
-	Roles  []string `json:"roles"`
-	Type   string   `json:"token_type"`
+	UserID uuid.UUID `json:"uuid"`
+	Roles  []string  `json:"roles"`
+	Type   string    `json:"token_type"`
 	jwt.RegisteredClaims
 }
 
@@ -55,7 +59,11 @@ type Claims struct {
 // It must insert an object where the UserID and his roles are available down
 // the line to other services.
 func (a *AuthManager) Authenticating() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
+	return func(ctx context.Context,
+		req any,
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (resp any, err error) {
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
 			return nil, status.Errorf(codes.Unauthenticated, "missing metadata")
@@ -81,22 +89,48 @@ func (a *AuthManager) Authenticating() grpc.UnaryServerInterceptor {
 func (a *AuthManager) handleBasicAuth(ctx context.Context, req any, handler grpc.UnaryHandler, authHeader string) (any, error) {
 	encodedCreds := strings.TrimPrefix(authHeader, "Basic ")
 	decodedCreds, err := base64.StdEncoding.DecodeString(encodedCreds)
-	decodedStr := strings.TrimSpace(string(decodedCreds))
 	if err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "invalid basic auth encoding: %v", err)
 	}
+	decodedStr := strings.TrimSpace(string(decodedCreds))
 
 	credsParts := strings.SplitN(decodedStr, ":", 2)
 	if len(credsParts) != 2 {
 		return nil, status.Errorf(codes.Unauthenticated, "invalid basic auth format")
 	}
 
-	creds := &Credentials{
-		Email:  credsParts[0],
-		Secret: secrets.Secret(credsParts[1]),
+	userSecret, err := a.db.GetUserSecretsFromEmail(ctx, credsParts[0])
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, status.Error(codes.NotFound, "User does not exist")
+		}
+		return nil, status.Error(codes.Internal, "Failed to query user credentials")
+	}
+	err = sec.ValidateCreds(credsParts[1], userSecret.Hash, userSecret.Salt)
+	if err != nil {
+		if errors.Is(err, sec.ErrInvalidCreds) {
+			return nil, status.Error(codes.Unauthenticated, "Invalid credentials provided")
+		}
+		return nil, status.Error(codes.Unauthenticated, "Invalid credentials format provided")
 	}
 
-	newCtx := context.WithValue(ctx, util.CredentialsKey, creds)
+	// No errors mean successful hash validation, user credentials are stored in a "fake" jwt token
+	// to streamline behaviour.
+	roles, err := a.db.GetUserRoles(ctx, userSecret.UserID)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, status.Errorf(codes.Internal, "Failed to retrieve user roles")
+		}
+		roles = []string{}
+	}
+
+	creds := &Claims{
+		UserID: userSecret.UserID,
+		Roles:  roles,
+		Type:   string(BasicTokenType),
+	}
+
+	newCtx := context.WithValue(ctx, util.JwtKey, creds)
 	return handler(newCtx, req)
 }
 
@@ -118,9 +152,17 @@ func (a *AuthManager) handleBearerAuth(ctx context.Context, req any, handler grp
 		slog.WarnContext(ctx, "Unable to extract custom claims from JWT")
 		return handler(ctx, req)
 	} else {
-		revoked := false
-		row := a.revokeCheck.QueryRowContext(ctx, tokenWithClaims.ID)
-		err := row.Scan(&revoked)
+		tokenID, err := uuid.Parse(tokenWithClaims.ID)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to parse uuid from jwt",
+				logging.ErrKey, err,
+			)
+			return nil, status.Error(
+				codes.Internal,
+				"failure while ensuring token isn't revoked",
+			)
+		}
+		revoked, err := a.db.TokenIsRevoked(ctx, tokenID)
 		if err != nil {
 			slog.ErrorContext(ctx, "failed to ensure provided token is not revoked",
 				logging.ErrKey, err,
@@ -140,26 +182,26 @@ func (a *AuthManager) handleBearerAuth(ctx context.Context, req any, handler grp
 	}
 }
 
-func (a *AuthManager) Issue(userID string, roles []string) (string, string, error) {
+// Issue generates and returns a new access token and refresh token for the given user ID and roles.
+// It returns the access token string, refresh token string, and an error if any occurs during the process.
+func (a *AuthManager) Issue(userID uuid.UUID, roles []string) (string, string, error) {
 	now := time.Now().UTC()
-	accessID, accessIDErr := uuid.GenerateUUID()
-	refreshID, refreshIDErr := uuid.GenerateUUID()
-	if accessIDErr != nil || refreshIDErr != nil {
-		return "", "", uuidErr
-	}
+	accessID := uuid.New()
+	refreshID := uuid.New()
 
 	// Create the accessClaims
 	accessClaims := Claims{
 		UserID: userID,
 		Roles:  roles,
-		Type:   accessTokenName,
+		Type:   string(AccessTokenType),
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    issuer,
-			Subject:   userID,
-			Audience:  []string{"your-app-audience"},
+			Subject:   userID.String(),
 			ExpiresAt: jwt.NewNumericDate(now.Add(a.cfg.JWTAccessTTL)),
 			IssuedAt:  jwt.NewNumericDate(now),
-			ID:        accessID,
+			ID:        accessID.String(),
+
+			// Audience:  []string{},
 		},
 	}
 
@@ -174,12 +216,12 @@ func (a *AuthManager) Issue(userID string, roles []string) (string, string, erro
 	refreshClaims := Claims{
 		UserID: userID,
 		Roles:  roles,
-		Type:   refreshTokenName,
+		Type:   string(RefreshTokenType),
 		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   userID,
+			Subject:   userID.String(),
 			ExpiresAt: jwt.NewNumericDate(now.Add(a.cfg.JWTRefreshTTL)),
 			IssuedAt:  jwt.NewNumericDate(now),
-			ID:        refreshID,
+			ID:        refreshID.String(),
 		},
 	}
 
@@ -193,7 +235,39 @@ func (a *AuthManager) Issue(userID string, roles []string) (string, string, erro
 	return accessTokenString, refreshTokenString, nil
 }
 
-func NewManager(vault secrets.SecretVault, db *sql.DB, cfg *util.ConfigStore) (*AuthManager, error) {
+// Since there are some encpoints that don't require authentication (Signup)
+// The JWT interceptor can let unauthenticated request pass through. Not
+// catching this can (and will) lead to nil pointer dereferences. This function
+// returns a protobuf-ready error to allow auth-dependent endpoints to use the
+// following pattern:
+//
+//	creds, err := auth.GetCreds(ctx, TokenBasicName)
+//	if err != nil {
+//		return nil, err
+//	}
+func GetCreds(ctx context.Context, expects tokenType) (*Claims, error) {
+	creds := util.GetFromContext[Claims](ctx, util.JwtKey)
+	if creds == nil {
+		slog.WarnContext(ctx,
+			"User is not authenticated, cannot proceed with request",
+		)
+		return nil, status.Error(codes.Unauthenticated,
+			"Current endpoint requires JWT authentication to proceed and found none. Operation aborted",
+		)
+	} else {
+		if creds.Type != string(expects) {
+			slog.WarnContext(ctx,
+				"User provided the wrong type of token, cannot proceed with request",
+			)
+			return nil, status.Errorf(codes.InvalidArgument,
+				"Invalid token type for this endpoint. Expected: '%s', Got: '%s'", expects, creds.Type,
+			)
+		}
+		return creds, nil
+	}
+}
+
+func NewManager(vault secrets.SecretVault, db *database.Queries, cfg *util.ConfigStore) (*AuthManager, error) {
 	pubkey, pubErr := vault.Get("server-pubkey")
 	privkey, privErr := vault.Get("server-privkey")
 	if pubErr != nil || privErr != nil {
@@ -215,31 +289,54 @@ func NewManager(vault secrets.SecretVault, db *sql.DB, cfg *util.ConfigStore) (*
 		privkey = secrets.Secret(privateKey)
 	}
 
-	// The validation check is not set in the db package to avoid circular
-	// dependencies. This should be the only one though
-	stmt, err := db.Prepare(
-		"SELECT EXISTS(SELECT 1 FROM RevokedTokens WHERE tokenID = ?)",
-	)
-	if err != nil {
-		slog.Error("Failed to prepare revocation check query for JWT",
-			logging.ErrKey, err,
-		)
-	}
-
 	return &AuthManager{
-		db:          db,
-		pubKey:      pubkey,
-		privKey:     privkey,
-		revokeCheck: stmt,
-		cfg:         cfg,
+		pubKey:  pubkey,
+		privKey: privkey,
+		db:      db,
+		cfg:     cfg,
 	}, nil
 }
 
-func (a *AuthManager) Close() {
-	err := a.revokeCheck.Close()
+func (a *AuthManager) RevokeToken(ctx context.Context, token *Claims) error {
+	tokenID, err := uuid.Parse(token.ID)
 	if err != nil {
-		slog.Error("Failure closing the token revocation check query for JWT",
-			logging.ErrKey, err,
+		slog.ErrorContext(ctx, "Failed to parse token ID", logging.ErrKey, err)
+		return status.Error(codes.InvalidArgument, "Invalid token ID")
+	}
+
+	err = a.db.RevokeToken(ctx, database.RevokeTokenParams{
+		TokenID: tokenID,
+		Expiry:  token.ExpiresAt.Time.UTC(),
+	})
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to revoke token", logging.ErrKey, err)
+		return status.Error(codes.Internal, "Token revocation failure")
+	}
+
+	err = a.db.CleanupExpiredToken(ctx, tokenID)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to cleanup expired token", logging.ErrKey, err)
+		// client shouldn't be concerned with internal housekeeping, don't return an error
+	}
+
+	return nil
+}
+
+func (a *AuthManager) ValidatePasswd(p string) error {
+	// Password length
+	if l := len(p); l < a.cfg.MinPasswdLen || l > a.cfg.MaxPasswdLen {
+		return status.Errorf(codes.InvalidArgument,
+			"Provided password is of length %d which is outside of the accepted range [%d-%d]",
+			l, a.cfg.MinPasswdLen, a.cfg.MaxPasswdLen,
 		)
 	}
+	// Illegal password characters
+	for _, r := range p {
+		if r < 32 || r > 126 {
+			return status.Errorf(codes.InvalidArgument,
+				"Provided password contains illegal characters. Allowed characters are in the [32-126] range (https://www.ascii-code.com)",
+			)
+		}
+	}
+	return nil
 }

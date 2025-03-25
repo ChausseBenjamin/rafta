@@ -3,12 +3,9 @@ package pb
 import (
 	"context"
 	"log/slog"
-	"time"
 
 	"github.com/ChausseBenjamin/rafta/internal/auth"
-	"github.com/ChausseBenjamin/rafta/internal/db"
 	"github.com/ChausseBenjamin/rafta/internal/logging"
-	"github.com/ChausseBenjamin/rafta/internal/util"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -17,48 +14,52 @@ import (
 )
 
 func (s *adminServer) GetAllUsers(ctx context.Context, _ *emptypb.Empty) (*m.UserList, error) {
-	creds := util.GetFromContext[auth.Claims](ctx, util.JwtKey)
-	if !hasRequiredRole(creds.Roles, allowedAdminRoles) {
-		return nil, status.Error(
-			codes.PermissionDenied,
-			"User does not have the authority to query all users",
-		)
-	}
-
-	users := []*m.User{}
-	fetchAll := s.store.Common[db.GetAllUsers]
-	rows, err := fetchAll.QueryContext(ctx)
+	creds, err := auth.GetCreds(ctx, auth.AccessTokenType)
 	if err != nil {
-		slog.WarnContext(ctx, "Failed to query the list of signed up users")
+		return nil, err
 	}
-	defer rows.Close()
 
-	for rows.Next() {
-		var (
-			uuid    string
-			name    string
-			email   string
-			created time.Time
-			updated time.Time
-		)
-		if err := rows.Scan(&uuid, &name, &email, &created, &updated); err != nil {
-			slog.WarnContext(ctx,
-				"Failed to query certain user data, response may be incomplete",
+	if err := s.hasAdminRights(ctx, creds); err != nil {
+		return nil, err
+	}
+
+	allUsers, err := s.db.GetAllUsers(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failure to fetch all users", logging.ErrKey, err)
+		return nil, status.Error(codes.Internal, "Failed to fetch all users")
+	}
+
+	allUsersPb := make([]*m.User, len(allUsers))
+
+	for i, u := range allUsers {
+		roles, err := s.db.GetUserRoles(ctx, u.UserID)
+		if err != nil {
+			slog.ErrorContext(ctx,
+				"Failed to query roles for a specific user",
+				"user_id", u.UserID,
 				logging.ErrKey, err,
 			)
+			return nil, status.Errorf(codes.Internal,
+				"Failed to query roles for user '%v'", u.UserID,
+			)
 		}
-		users = append(users, &m.User{
-			Id: &m.UUID{Value: uuid},
+
+		allUsersPb[i] = &m.User{
+			Id: &m.UUID{Value: u.UserID.String()},
 			Data: &m.UserData{
-				Name:  name,
-				Email: email,
+				Name:  u.Name,
+				Email: u.Email,
 			},
 			Metadata: &m.UserMetadata{
-				CreatedOn: timestamppb.New(created.UTC()),
-				UpdatedOn: timestamppb.New(updated.UTC()),
+				Roles:     roles,
+				CreatedOn: timestamppb.New(u.CreatedAt.UTC()),
+				UpdatedOn: timestamppb.New(u.UpdatedAt.UTC()),
 			},
-		})
+		}
 	}
 
-	return &m.UserList{Users: users}, nil
+	slog.InfoContext(ctx, "success", "user_id", creds.UserID)
+	return &m.UserList{
+		Users: allUsersPb,
+	}, nil
 }

@@ -3,25 +3,43 @@ package pb
 import (
 	"context"
 	"log/slog"
-	"time"
 
-	"github.com/ChausseBenjamin/rafta/internal/db"
+	"github.com/ChausseBenjamin/rafta/internal/logging"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
+	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+const msgNoNewUser = "The server is not accepting new users at this time. If you are and administrator and wish to circumvent this, please use the 'Admin/CreateUser' endpoint"
+
 func (s *authServer) Signup(ctx context.Context, req *m.UserSignupRequest) (*m.SignupResponse, error) {
-	nbStmt := s.store.Common[db.GetUserCount]
-	var userCount int
-	err := nbStmt.QueryRowContext(ctx).Scan(&userCount)
-	if err != nil {
-		slog.WarnContext(ctx, "Failed to query the number of signed up users")
+	if !s.cfg.AllowNewUsers {
+		slog.WarnContext(ctx,
+			"Blocked signup attempt as public signups are currently closed",
+		)
+		return nil, status.Error(codes.FailedPrecondition, msgNoNewUser)
 	}
 
-	if !s.cfg.AllowNewUsers || (userCount >= int(s.cfg.MaxUsers)) {
-		return nil, status.Errorf(codes.FailedPrecondition, "The server is not accepting new signups at this time")
+	// 0 implies no user limit
+	if s.cfg.MaxUsers > 0 {
+		userCount, err := s.db.GetUserCount(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx,
+				"Failed to determine the platforms user count to limit signups",
+				logging.ErrKey, err,
+			)
+			return nil, status.Error(codes.Internal,
+				"Failed to determine if the platform accepts new users",
+			)
+		}
+
+		if userCount >= int64(s.cfg.MaxUsers) {
+			slog.WarnContext(ctx,
+				"Blocked signup attempt as server has reached max-user capacity",
+			)
+			return nil, status.Error(codes.FailedPrecondition, msgNoNewUser)
+		}
 	}
 
 	user, err := s.newUser(ctx, req)
@@ -29,35 +47,32 @@ func (s *authServer) Signup(ctx context.Context, req *m.UserSignupRequest) (*m.S
 		return nil, err
 	}
 
-	roles, err := s.getUserRoles(ctx, user.Id.Value)
+	userID, err := uuid.Parse(user.Id.Value)
 	if err != nil {
-		slog.WarnContext(ctx, "Failed to retrieve user roles for JWT creation")
-		return nil, err
+		slog.ErrorContext(ctx,
+			"failed to parse user ID during signup",
+			"user_id", user.Id.Value,
+			logging.ErrKey, err,
+		)
+		return nil, status.Error(codes.Internal,
+			"Failed to create a user identifier",
+		)
 	}
 
-	access, refresh, err := s.authMgr.Issue(user.Id.Value, roles)
+	acess, refresh, err := s.auth.Issue(userID, user.Metadata.Roles)
 	if err != nil {
-		slog.WarnContext(ctx, "Failed to generate new JTW pair")
+		slog.ErrorContext(ctx,
+			"Failed to generate JWT pair",
+			logging.ErrKey, err,
+		)
+		return nil, status.Error(codes.Internal, "Failure during token generation")
 	}
 
-	slog.InfoContext(ctx, "Successful user signup")
+	slog.InfoContext(ctx, "success", "user_id", user.Id)
 	return &m.SignupResponse{
-		User: &m.User{
-			Id: &m.UUID{Value: user.Id.Value},
-			Data: &m.UserData{
-				Name:  req.User.Name,
-				Email: req.User.Email,
-			},
-			Metadata: &m.UserMetadata{
-				// NOTE: Since sqlite defaults to the current time
-				// we assume the difference with time.Now() is negligible
-				// It will be "correctly" sent on next login anyway...
-				CreatedOn: timestamppb.New(time.Now().UTC()),
-				UpdatedOn: timestamppb.New(time.Now().UTC()),
-			},
-		},
+		User: user,
 		Tokens: &m.JWT{
-			Access:  access,
+			Access:  acess,
 			Refresh: refresh,
 		},
 	}, nil

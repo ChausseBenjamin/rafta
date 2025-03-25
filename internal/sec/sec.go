@@ -1,4 +1,6 @@
-package auth
+// sec handles miscelaneous security functions like hash validation and
+// password generation.
+package sec
 
 import (
 	"crypto/rand"
@@ -7,9 +9,7 @@ import (
 	"errors"
 	"math/big"
 	"runtime"
-	"strings"
 
-	"github.com/ChausseBenjamin/rafta/internal/secrets"
 	"golang.org/x/crypto/argon2"
 )
 
@@ -23,77 +23,73 @@ const (
 	genPasswordLength = 24
 )
 
-var threads uint8 = uint8(runtime.NumCPU())
+var (
+	threads uint8 = uint8(runtime.NumCPU())
 
-type Credentials struct {
-	Email  string
-	Secret secrets.Secret
-}
+	ErrInvalidCreds     = errors.New("invalid credentials")
+	errHashSizeMismatch = errors.New("invalid hash size")
+	errInvalidSaltEnc   = errors.New("invalid salt encoding")
+	errInvalidHashEnc   = errors.New("invalid hash encoding")
+)
 
 // GenerateHash generates a hash for the given secret using the Argon2id algorithm.
-// It returns the hash in the format "salt$hash", both base64 encoded.
-func GenerateHash(secret string) (string, error) {
+// It returns (hash, salt, error)
+func GenerateHash(secret string) (string, string, error) {
 	salt := make([]byte, ArgonSaltSize)
 	if _, err := rand.Read(salt); err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	hash := argon2.IDKey([]byte(secret), salt, ArgonTime, ArgonMemory, threads, ArgonKeyLength)
 
-	return strings.Join([]string{
+	return base64.StdEncoding.EncodeToString(hash),
 		base64.StdEncoding.EncodeToString(salt),
-		base64.StdEncoding.EncodeToString(hash),
-	}, "$"), nil
+		nil
 }
 
 // ValidateCreds validates the provided secret against the stored hash.
 // The stored hash is expected to be in the format "salt$hash", both base64
 // encoded.
-func ValidateCreds(secret, stored string) error {
-	parts := strings.Split(stored, "$")
-	if len(parts) != 2 {
-		return errors.New("invalid hash format")
-	}
-
-	salt, err := base64.StdEncoding.DecodeString(parts[0])
+func ValidateCreds(passwd, hashStr, saltStr string) error {
+	dSalt, err := base64.StdEncoding.DecodeString(saltStr)
 	if err != nil {
-		return errors.New("invalid salt encoding")
+		return errInvalidSaltEnc
 	}
 
-	expectedHash, err := base64.StdEncoding.DecodeString(parts[1])
+	expHash, err := base64.StdEncoding.DecodeString(hashStr)
 	if err != nil {
-		return errors.New("invalid hash encoding")
+		return errInvalidHashEnc
 	}
 
-	computedHash := argon2.IDKey([]byte(secret), salt, ArgonTime, ArgonMemory, threads, ArgonKeyLength)
+	compHash := argon2.IDKey([]byte(passwd), dSalt, ArgonTime, ArgonMemory, threads, ArgonKeyLength)
 
 	// Constant-time comparison
-	if len(computedHash) != len(expectedHash) {
-		return errors.New("invalid credentials")
+	if len(compHash) != len(expHash) {
+		return errHashSizeMismatch
 	}
-	if subtle.ConstantTimeCompare(computedHash, expectedHash) != 1 {
-		return errors.New("invalid credentials")
+	if subtle.ConstantTimeCompare(compHash, expHash) != 1 {
+		return ErrInvalidCreds
 	}
 
 	return nil
 }
 
 // GenPassword generates a random password and its hash.
-// It returns the generated password, its hash, and an error if any.
+// It returns the (passwd, hash, salt, error).
 // This function is mostly here to generate a random password for
 // an admin user if none exists in the DB upon service startup.
-func GenPassword() (string, string, error) {
+func GenPassword() (string, string, string, error) {
 	psswd := make([]byte, genPasswordLength)
 	for i := range psswd {
 		n, err := rand.Int(rand.Reader, big.NewInt(95))
 		if err != nil {
-			return "", "", err
+			return "", "", "", err
 		}
 		psswd[i] = byte(n.Int64() + 32)
 	}
-	hash, err := GenerateHash(string(psswd))
+	hash, salt, err := GenerateHash(string(psswd))
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
-	return string(psswd), hash, nil
+	return string(psswd), hash, salt, nil
 }

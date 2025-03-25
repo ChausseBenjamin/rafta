@@ -5,12 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
-	"time"
 
 	"github.com/ChausseBenjamin/rafta/internal/auth"
-	"github.com/ChausseBenjamin/rafta/internal/db"
 	"github.com/ChausseBenjamin/rafta/internal/logging"
-	"github.com/ChausseBenjamin/rafta/internal/util"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -19,65 +16,39 @@ import (
 )
 
 func (s *authServer) Login(ctx context.Context, _ *emptypb.Empty) (*m.LoginResponse, error) {
-	var (
-		name    string
-		uuid    string
-		created time.Time
-		updated time.Time
-		hash    string
-	)
+	creds, err := auth.GetCreds(ctx, auth.BasicTokenType)
+	if err != nil {
+		return nil, err
+	}
 
-	creds := util.GetFromContext[auth.Credentials](ctx, util.CredentialsKey)
-
-	stmt := s.store.Common[db.GetUserWithSecret]
-	row := stmt.QueryRowContext(ctx, creds.Email)
-	err := row.Scan(&name, &uuid, &created, &updated, &hash)
+	user, err := s.db.GetUser(ctx, creds.UserID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			slog.InfoContext(ctx,
-				"Failed login attempt, user not found",
-				logging.ErrKey, err,
-			)
-			err = status.Errorf(codes.NotFound,
-				"No user with email %s", creds.Email,
-			)
-			return nil, err
+			return nil, status.Error(codes.NotFound, "User not found")
 		}
+		return nil, status.Error(codes.Internal, "Failed to retrieve user info")
 	}
 
-	if err := auth.ValidateCreds(creds.Secret.String(), hash); err != nil {
-		slog.InfoContext(ctx,
-			"Failed login attempt, invalid credentials",
+	access, refresh, err := s.auth.Issue(creds.UserID, creds.Roles)
+	if err != nil {
+		slog.ErrorContext(ctx,
+			"Failure during JWT pair generation",
 			logging.ErrKey, err,
 		)
-		err = status.Errorf(codes.Unauthenticated,
-			"Invalid credentials for user %s", creds.Email,
-		)
-		return nil, err
+		return nil, status.Error(codes.Internal, "Failure during JWT generation")
 	}
 
-	roles, err := s.getUserRoles(ctx, uuid)
-	if err != nil {
-		slog.WarnContext(ctx, "Failed to retrieve user roles for JWT creation")
-		return nil, err
-	}
-
-	access, refresh, err := s.authMgr.Issue(uuid, roles)
-	if err != nil {
-		slog.WarnContext(ctx, "Failed to generate new JTW pair")
-	}
-
-	slog.InfoContext(ctx, "Successful user login")
+	slog.InfoContext(ctx, "success", "user_id", user.UserID)
 	return &m.LoginResponse{
 		User: &m.User{
-			Id: &m.UUID{Value: uuid},
+			Id: &m.UUID{Value: user.UserID.String()},
 			Data: &m.UserData{
-				Name:  name,
-				Email: creds.Email,
+				Name:  user.Name,
+				Email: user.Email,
 			},
 			Metadata: &m.UserMetadata{
-				CreatedOn: timestamppb.New(created),
-				UpdatedOn: timestamppb.New(updated),
+				CreatedOn: timestamppb.New(user.CreatedAt.UTC()),
+				UpdatedOn: timestamppb.New(user.UpdatedAt.UTC()),
 			},
 		},
 		Tokens: &m.JWT{

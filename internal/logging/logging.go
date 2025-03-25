@@ -21,6 +21,8 @@ var (
 	ErrInvalidFormat = errors.New("invalid log format")
 )
 
+const DisableLogs log.Formatter = 255
+
 func Setup(lvlStr, fmtStr, outStr string) error {
 	output, outputErr := setOutput(outStr)
 	format, formatErr := setFormat(fmtStr)
@@ -31,20 +33,26 @@ func Setup(lvlStr, fmtStr, outStr string) error {
 		prefixStr = "Rafta 🚢"
 	}
 
-	var h slog.Handler = log.NewWithOptions(
-		output,
-		log.Options{
-			TimeFormat:   time.DateTime,
-			Prefix:       prefixStr,
-			Level:        level,
-			ReportCaller: true,
-			Formatter:    format,
-		},
-	)
+	var h slog.Handler
+	if format == DisableLogs {
+		h = DiscardHandler{}
+	} else {
+		h = log.NewWithOptions(
+			output,
+			log.Options{
+				TimeFormat:   time.DateTime,
+				Prefix:       prefixStr,
+				Level:        level,
+				ReportCaller: true,
+				Formatter:    format,
+			},
+		)
 
-	h = withTrackedContext(h, util.ReqIDKey, "request_id")
-	h = withTrackedContext(h, util.ProtoMethodKey, "proto_method")
-	h = withStackTrace(h)
+		h = withTrackedContext(h, util.ReqIDKey, "request_id")
+		h = withTrackedContext(h, util.ProtoMethodKey, "proto_method")
+		h = withStackTrace(h)
+	}
+
 	slog.SetDefault(slog.New(h))
 	return errors.Join(outputErr, formatErr, levelErr)
 }
@@ -72,6 +80,8 @@ func setFormat(f string) (log.Formatter, error) {
 		return log.TextFormatter, nil
 	case "json", "structured":
 		return log.JSONFormatter, nil
+	case "none", "off":
+		return DisableLogs, nil
 	}
 	return log.TextFormatter, ErrInvalidFormat
 }

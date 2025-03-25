@@ -5,38 +5,53 @@ import (
 	"log/slog"
 
 	"github.com/ChausseBenjamin/rafta/internal/auth"
-	"github.com/ChausseBenjamin/rafta/internal/db"
+	"github.com/ChausseBenjamin/rafta/internal/database"
 	"github.com/ChausseBenjamin/rafta/internal/logging"
+	"github.com/ChausseBenjamin/rafta/internal/sec"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
+	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func (s *adminServer) UpdateCredentials(ctx context.Context, req *m.ChangePasswdRequest) (*emptypb.Empty, error) {
-	if err := s.validatePasswd(req.Secret); err != nil {
+	creds, err := auth.GetCreds(ctx, auth.AccessTokenType)
+	if err != nil {
 		return nil, err
 	}
 
-	hash, err := auth.GenerateHash(req.Secret)
+	if err := s.hasAdminRights(ctx, creds); err != nil {
+		return nil, err
+	}
+
+	userID, err := uuid.Parse(req.Id.Value)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to hash user password", logging.ErrKey, err)
+		slog.ErrorContext(ctx, "Failed to parse token ID", logging.ErrKey, err)
+		return nil, status.Error(codes.InvalidArgument, "Invalid target user ID")
+	}
+
+	if err := s.auth.ValidatePasswd(req.Secret); err != nil {
+		return nil, err
+	}
+
+	hash, salt, err := sec.GenerateHash(req.Secret)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failure to hash user password", logging.ErrKey, err)
 		return nil, status.Errorf(codes.Internal,
 			"Couldn't create a hash for user authentication",
 		)
 	}
 
-	stmt := s.store.Common[db.UpdateUserPasswd]
-	_, err = stmt.ExecContext(ctx, hash, req.Id.Value)
-	if err != nil {
-		slog.ErrorContext(ctx, "Failed to change user password",
-			"uuid", req.Id.Value,
-			logging.ErrKey, err,
-		)
-		return nil, status.Errorf(codes.Internal,
-			"Failed to update password for user '%s'", req.Id.Value,
-		)
+	if err := s.db.UpdateUserSecret(ctx, database.UpdateUserSecretParams{
+		UserID: userID,
+		Salt:   salt,
+		Hash:   hash,
+	}); err != nil {
+		slog.ErrorContext(ctx, "Failure during user credentials update", logging.ErrKey, err)
+		return nil, status.Error(codes.Internal, "Failed to update credentials")
 	}
 
+	slog.InfoContext(ctx, "success", "user_id", creds.UserID)
 	return &emptypb.Empty{}, nil
 }

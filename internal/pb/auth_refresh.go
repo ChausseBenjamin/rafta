@@ -5,49 +5,62 @@ import (
 	"log/slog"
 
 	"github.com/ChausseBenjamin/rafta/internal/auth"
-	"github.com/ChausseBenjamin/rafta/internal/db"
+	"github.com/ChausseBenjamin/rafta/internal/database"
 	"github.com/ChausseBenjamin/rafta/internal/logging"
-	"github.com/ChausseBenjamin/rafta/internal/util"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
+	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-func (a *authServer) Refresh(ctx context.Context, _ *emptypb.Empty) (*m.JWT, error) {
-	claims := util.GetFromContext[auth.Claims](ctx, util.JwtKey)
-	if claims == nil {
-		slog.ErrorContext(ctx,
-			"Reached the Refresh endpoint without a valid token",
-		)
-		return nil, status.Error(codes.Internal, "Reached the Refresh endpoint without a valid token")
+func (s *authServer) Refresh(ctx context.Context, _ *emptypb.Empty) (*m.JWT, error) {
+	creds, err := auth.GetCreds(ctx, auth.RefreshTokenType)
+	if err != nil {
+		return nil, err
 	}
 
-	if t := claims.Type; t != "refresh" {
-		slog.WarnContext(ctx, "Client attempt to refresh with a non-refresh token", "provided", t)
-	}
-
-	// Ensure the refresh token cannot be reused twice by blacklisting it
-	stmt := a.store.Common[db.RevokeToken]
-	_, err := stmt.ExecContext(ctx, claims.ID, claims.ExpiresAt.Time.UTC())
+	tokenID, err := uuid.Parse(creds.ID)
 	if err != nil {
 		slog.ErrorContext(ctx,
-			"Failed to enforce single-use of the refresh token",
+			"failed to parse refresh token id",
+			"token", tokenID,
 			logging.ErrKey, err,
 		)
+		// Internal error since token was successfully parse in the interceptor
 		return nil, status.Error(codes.Internal,
-			"Failure to enforce single-use policy for refresh token.",
+			"Failed to parse refresh token id",
 		)
 	}
 
-	access, refresh, err := a.authMgr.Issue(claims.UserID, claims.Roles)
+	err = s.db.RevokeToken(ctx, database.RevokeTokenParams{
+		TokenID: tokenID,
+		Expiry:  creds.ExpiresAt.Time.UTC(),
+	})
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to add revoked token to database")
+		return nil, status.Error(codes.Internal,
+			"failed to revoke refresh token. Operation aborted",
+		)
+	}
+	if err := s.db.CleanupExpiredToken(ctx, tokenID); err != nil {
+		// Non-critical, clients shouldn't be blocked by housekeeping errors
+		slog.WarnContext(ctx, "Failed to schedule token deletion after expiry",
+			logging.ErrKey, err,
+		)
+	}
+
+	// No need to fetch the database, roles are already provided
+	access, refresh, err := s.auth.Issue(creds.UserID, creds.Roles)
 	if err != nil {
 		slog.ErrorContext(ctx,
-			"Failed to issue new JWT token pair (access+refresh).",
+			"failed to issue a JWT pair",
+			logging.ErrKey, err,
 		)
-		return nil, status.Error(codes.Internal, "JWT token generation failed")
+		return nil, status.Error(codes.Internal, "JWT generation failed")
 	}
 
+	slog.InfoContext(ctx, "success", "user_id", creds.UserID)
 	return &m.JWT{
 		Access:  access,
 		Refresh: refresh,

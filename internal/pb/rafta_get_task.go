@@ -2,85 +2,59 @@ package pb
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"log/slog"
-	"time"
 
-	"github.com/ChausseBenjamin/rafta/internal/db"
+	"github.com/ChausseBenjamin/rafta/internal/auth"
+	"github.com/ChausseBenjamin/rafta/internal/database"
 	"github.com/ChausseBenjamin/rafta/internal/logging"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
+	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (s *raftaServer) GetTask(ctx context.Context, id *m.UUID) (*m.Task, error) {
-	creds, err := getCreds(ctx)
+	creds, err := auth.GetCreds(ctx, auth.AccessTokenType)
 	if err != nil {
 		return nil, err
 	}
 
-	row := s.store.Common[db.GetUserTask].QueryRowContext(
-		ctx,
-		creds.UserID,
-		id.Value,
-	)
-
-	var (
-		title             string
-		priority          uint32
-		desc              string
-		recurrencePattern string
-		recurrenceActive  bool
-		dueDate           time.Time
-		doDate            time.Time
-		created           time.Time
-		updated           time.Time
-	)
-
-	if err := row.Scan(
-		&title,
-		&priority,
-		&desc,
-		&dueDate,
-		&doDate,
-		&recurrencePattern,
-		&recurrenceActive,
-		&created,
-		&updated,
-	); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			slog.WarnContext(ctx, "User fetched a non-existent task")
-			return nil, status.Error(codes.NotFound,
-				"Requested task does not exist",
-			)
-		}
-		slog.ErrorContext(ctx,
-			"Failure while fetching specific task for user",
+	taskID, err := uuid.Parse(id.Value)
+	if err != nil {
+		slog.WarnContext(ctx,
+			"failed to parse provided taskID",
+			"task_id", id.Value,
 			logging.ErrKey, err,
 		)
-		return nil, status.Error(codes.Internal,
-			"Failure to fetch specific task",
+		return nil, status.Errorf(codes.InvalidArgument,
+			"Failed to parse provided task id. Parser returned '%v'", err,
 		)
 	}
 
-	return &m.Task{
-		Id: id,
-		Data: &m.TaskData{
-			Title:    title,
-			Priority: priority,
-			Desc:     desc,
-			Recurrence: &m.TaskRecurrence{
-				Pattern: recurrencePattern,
-				Active:  recurrenceActive,
-			},
-			DueDate: timestamppb.New(dueDate),
-			DoDate:  timestamppb.New(doDate),
-		},
-		Metadata: &m.TaskMetadata{
-			CreatedOn: timestamppb.New(created),
-			UpdatedOn: timestamppb.New(updated),
-		},
-	}, nil
+	task, err := s.db.GetUserTask(ctx, database.GetUserTaskParams{
+		TaskID: taskID,
+		Owner:  creds.UserID,
+	})
+	if err != nil {
+		slog.ErrorContext(ctx,
+			"failed to retrieve task",
+			logging.ErrKey, err,
+		)
+		return nil, status.Error(codes.Internal, "failed to retrieve task")
+	}
+
+	tags, err := s.db.GetTaskTags(ctx, task.TaskID)
+	if err != nil {
+		slog.ErrorContext(ctx,
+			"failed to retrieve tags associated with task",
+			"task_id", task.TaskID,
+			logging.ErrKey, err,
+		)
+		return nil, status.Errorf(codes.Internal,
+			"Failure while retrieving tags associated with '%v'", task.TaskID,
+		)
+	}
+
+	slog.InfoContext(ctx, "success")
+	return taskToPb(task, tags), nil
 }

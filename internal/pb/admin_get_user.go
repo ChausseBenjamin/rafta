@@ -2,64 +2,74 @@ package pb
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"log/slog"
-	"time"
 
-	"github.com/ChausseBenjamin/rafta/internal/db"
+	"github.com/ChausseBenjamin/rafta/internal/auth"
 	"github.com/ChausseBenjamin/rafta/internal/logging"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
+	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func (s *adminServer) GetUser(ctx context.Context, uuid *m.UUID) (*m.User, error) {
-	creds, err := getCreds(ctx)
+func (s *adminServer) GetUSer(ctx context.Context, id *m.UUID) (*m.User, error) {
+	creds, err := auth.GetCreds(ctx, auth.AccessTokenType)
 	if err != nil {
 		return nil, err
 	}
 
-	if !hasRequiredRole(creds.Roles, allowedAdminRoles) {
-		return nil, status.Error(
-			codes.PermissionDenied,
-			"User does not have the authority to query all users",
+	if err := s.hasAdminRights(ctx, creds); err != nil {
+		return nil, err
+	}
+
+	userID, err := uuid.Parse(id.Value)
+	if err != nil {
+		slog.WarnContext(ctx,
+			"failed to parse provided userID",
+			"user_id", id.Value,
+			logging.ErrKey, err,
+		)
+		return nil, status.Errorf(codes.InvalidArgument,
+			"Failed to parse provided user id. Parser returned '%v'", err,
 		)
 	}
 
-	var (
-		name    string
-		email   string
-		created time.Time
-		updated time.Time
-	)
-
-	fetch := s.store.Common[db.GetUser]
-	row := fetch.QueryRowContext(ctx, uuid.Value)
-	if err := row.Scan(&name, &email, &created, &updated); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			slog.WarnContext(ctx, "Admin did not find a user he was querying", "user", uuid.Value)
-			return nil, status.Errorf(codes.NotFound,
-				"No user with userID '%s' was found within the database", uuid.Value,
-			)
-		} else {
-			slog.ErrorContext(ctx, "Failed to query db for a specific user",
-				logging.ErrKey, err,
-			)
-			return nil, status.Errorf(codes.Internal, "Failed to query specific user data")
-		}
+	user, err := s.db.GetUser(ctx, userID)
+	if err != nil {
+		slog.ErrorContext(ctx,
+			"Failed to fetch user",
+			"user_id", user.UserID,
+			logging.ErrKey, err,
+		)
+		return nil, status.Errorf(codes.Internal,
+			"Failed to query user '%v'", user.UserID,
+		)
 	}
 
+	roles, err := s.db.GetUserRoles(ctx, user.UserID)
+	if err != nil {
+		slog.ErrorContext(ctx,
+			"Failed to query roles for the user",
+			"user_id", user.UserID,
+			logging.ErrKey, err,
+		)
+		return nil, status.Errorf(codes.Internal,
+			"Failed to query roles for user '%v'", user.UserID,
+		)
+	}
+
+	slog.InfoContext(ctx, "success", "user_id", creds.UserID)
 	return &m.User{
-		Id: &m.UUID{Value: uuid.Value},
+		Id: &m.UUID{Value: userID.String()},
 		Data: &m.UserData{
-			Name:  name,
-			Email: email,
+			Name:  user.Name,
+			Email: user.Email,
 		},
 		Metadata: &m.UserMetadata{
-			CreatedOn: timestamppb.New(created),
-			UpdatedOn: timestamppb.New(updated),
+			Roles:     roles,
+			CreatedOn: timestamppb.New(user.CreatedAt.UTC()),
+			UpdatedOn: timestamppb.New(user.UpdatedAt.UTC()),
 		},
 	}, nil
 }

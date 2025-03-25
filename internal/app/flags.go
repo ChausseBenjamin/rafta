@@ -39,7 +39,7 @@ func flags() []cli.Flag {
 			Name:    FlagLogFormat,
 			Aliases: []string{"f"},
 			Value:   "plain",
-			Usage:   "plain, json",
+			Usage:   "plain, json, none",
 			Sources: cli.EnvVars("LOG_FORMAT"),
 			Action:  validateLogFormat,
 		},
@@ -166,7 +166,7 @@ func validateLogLevel(ctx context.Context, cmd *cli.Command, s string) error {
 
 func validateLogFormat(ctx context.Context, cmd *cli.Command, s string) error {
 	s = strings.ToLower(s)
-	if s == "json" || s == "plain" {
+	if s == "json" || s == "plain" || s == "none" {
 		return nil
 	}
 	return nil

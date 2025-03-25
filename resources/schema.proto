@@ -6,7 +6,7 @@ import "protobuf/src/google/protobuf/timestamp.proto";
 option go_package = "github.com/ChausseBenjamin/rafta/pkg/model";
 
 message UUID {
-	string value = 1;
+  string value = 1;
 }
 
 enum TaskState {
@@ -34,8 +34,9 @@ message UserData {
 }
 
 message UserMetadata {
-  google.protobuf.Timestamp created_on = 1;
-  google.protobuf.Timestamp updated_on = 2;
+  repeated string           roles      = 1;
+  google.protobuf.Timestamp created_on = 2;
+  google.protobuf.Timestamp updated_on = 3;
 }
 
 message User {
@@ -45,18 +46,18 @@ message User {
 }
 
 message TaskRecurrence {
-	string pattern = 1;
-	bool   active  = 2;
+  string pattern = 1;
+  bool   active  = 2;
 }
 
 message TaskData {
   string                    title         = 1;
   string                    desc          = 2; // markdown
-	// Intentionally vague for flexible client implementation:
+  // Intentionally vague for flexible client implementation:
   // 0=undefined, 1=highest, 0xFFFFFFFF=lowest
   uint32                    priority      = 3;
   TaskState                 state         = 4;
-	TaskRecurrence            recurrence    = 5;
+  TaskRecurrence            recurrence    = 5;
   google.protobuf.Timestamp do_date       = 7;
   google.protobuf.Timestamp due_date      = 8;
   repeated string           tags          = 9;
@@ -69,21 +70,26 @@ message TaskMetadata {
 
 
 message TaskUpdateRequest {
-	UUID id        = 1;
-  TaskData data  = 2;
+  UUID                   id    = 1;
+  TaskData               data  = 2;
   repeated TaskFieldMask masks = 3;
 }
 
 message TaskUpdateResponse {
   TaskData               data  = 1;
-	TaskMetadata           meta  = 2;
+  TaskMetadata           meta  = 2;
   repeated TaskFieldMask masks = 3;
 }
 
 message Task {
   UUID         id       = 1;
   TaskData     data     = 2;
-	TaskMetadata metadata = 3;
+  TaskMetadata metadata = 3;
+}
+
+message NewTaskResponse {
+	UUID         id       = 1;
+	TaskMetadata metadata = 2;
 }
 
 message TaskList {
@@ -119,12 +125,12 @@ message RefreshRequest {
 }
 
 message ChangePasswdRequest {
-	UUID   id     = 1;
-	string secret = 2;
+  UUID   id     = 1;
+  string secret = 2;
 }
 
 message PasswdMessage {
-	string secret = 1;
+  string secret = 1;
 }
 
 // Accessible to all users only once authenticated
@@ -132,18 +138,18 @@ message PasswdMessage {
 // query/mutate their own data (which is implied from authentication).
 // Any task involoving another users data is done via the Admin service.
 service Rafta {
-	// Retrieval
+  // Retrieval
   rpc GetAllTasks(google.protobuf.Empty) returns (TaskList);
   rpc GetTask(UUID) returns (Task); // Input: task UUID
   rpc GetUserInfo(google.protobuf.Empty) returns (User);
 
-	// User Manipulation
-	rpc DeleteUser(google.protobuf.Empty) returns (google.protobuf.Empty);
-	rpc UpdateCredentials(PasswdMessage) returns (google.protobuf.Empty);
-	rpc UpdateUserInfo(User) returns (google.protobuf.Empty);
+  // User Manipulation
+  rpc DeleteUser(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc UpdateCredentials(PasswdMessage) returns (google.protobuf.Timestamp);
+  rpc UpdateUserInfo(UserData) returns (google.protobuf.Timestamp);
 
   // Task Manipulation
-  rpc CreateTask(TaskData) returns (Task);
+  rpc NewTask(TaskData) returns (NewTaskResponse);
   rpc DeleteTask(UUID) returns (google.protobuf.Empty);
   rpc UpdateTask(TaskUpdateRequest) returns (TaskUpdateResponse);
 
@@ -157,15 +163,15 @@ service Admin {
   rpc GetUserTasks(UUID) returns (TaskList);
 
   // Manipulation
-	rpc UpdateCredentials(ChangePasswdRequest) returns (google.protobuf.Empty);
-  rpc CreateUser(UserSignupRequest) returns (google.protobuf.Empty);
+  rpc UpdateCredentials(ChangePasswdRequest) returns (google.protobuf.Empty);
+  rpc NewUser(UserSignupRequest) returns (google.protobuf.Empty);
   rpc DeleteUser(UUID) returns (google.protobuf.Empty);
   rpc UpdateUser(User) returns (google.protobuf.Empty);
 
 }
 
 service Auth {
-	rpc Signup(UserSignupRequest) returns (SignupResponse);
+  rpc Signup(UserSignupRequest) returns (SignupResponse);
   rpc Login(google.protobuf.Empty) returns (LoginResponse);
   rpc Refresh(google.protobuf.Empty) returns (JWT);
 }

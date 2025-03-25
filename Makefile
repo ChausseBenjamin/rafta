@@ -7,6 +7,7 @@ setup:
 	git submodule update --init
 
 codegen: setup
+	sqlc generate
 	protoc \
 		--proto_path=resources \
 		--proto_path=external \
@@ -17,7 +18,7 @@ codegen: setup
 		resources/schema.proto
 
 protoset: setup
-	mkdir -p $(BUILD_DIR) || exit 1
+	mkdir -p $(BUILD_DIR)
 	protoc \
 		--proto_path=resources \
 		--proto_path=external \
@@ -26,12 +27,12 @@ protoset: setup
 		resources/schema.proto
 
 compile: codegen
-	mkdir -p $(BUILD_DIR) || exit 1
-	CGO_ENABLED=0 go run ./internal/autogen > $(BUILD_DIR)/$(APP).1
-	CGO_ENABLED=0 go build -o $(BUILD_DIR)/$(APP) .
+	mkdir -p $(BUILD_DIR)
+	go run ./internal/autogen > $(BUILD_DIR)/$(APP).1
+	go build -o $(BUILD_DIR)/$(APP) .
 
 clean:
-	rm -rf $(BUILD_DIR) || exit 1
+	rm -rf $(BUILD_DIR)
 
 .PHONY: run
 run: setup codegen

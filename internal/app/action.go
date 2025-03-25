@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"net"
@@ -12,7 +13,7 @@ import (
 	"time"
 
 	"github.com/ChausseBenjamin/rafta/internal/auth"
-	"github.com/ChausseBenjamin/rafta/internal/db"
+	"github.com/ChausseBenjamin/rafta/internal/database"
 	"github.com/ChausseBenjamin/rafta/internal/logging"
 	"github.com/ChausseBenjamin/rafta/internal/pb"
 	"github.com/ChausseBenjamin/rafta/internal/secrets"
@@ -42,7 +43,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	brutalShutdown := func() {}
 
 	application := func() {
-		server, store, authMgr, err := initApp(ctx, cmd)
+		server, db, queries, err := initApp(ctx, cmd)
 		if err != nil {
 			errAppChan <- err
 			return
@@ -51,8 +52,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		gracefulShutdown = func() {
 			once.Do(func() { // Ensure brutal shutdown isn't triggered later
 				server.GracefulStop()
-				store.Close()
-				authMgr.Close()
+				db.Close()
+				queries.Close()
 				slog.InfoContext(ctx, "Application shutdown")
 				close(shutdownDone) // Signal that graceful shutdown is complete
 			})
@@ -63,8 +64,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 				"Graceful shutdown delay exceeded, shutting down NOW!",
 			)
 			server.Stop()
-			store.Close()
-			authMgr.Close()
+			db.Close()
+			queries.Close()
 		}
 
 		port := fmt.Sprintf(":%d", cmd.Int(FlagListenPort))
@@ -111,7 +112,8 @@ func waitForTermChan() chan os.Signal {
 	return stopChan
 }
 
-func initApp(ctx context.Context, cmd *cli.Command) (*grpc.Server, *db.Store, *auth.AuthManager, error) {
+// func initApp(ctx context.Context, cmd *cli.Command) (*grpc.Server, *db.Store, *auth.AuthManager, error) {
+func initApp(ctx context.Context, cmd *cli.Command) (*grpc.Server, *sql.DB, *database.Queries, error) {
 	globalConf := &util.ConfigStore{
 		AllowNewUsers: !cmd.Bool(FlagDisablePubSignup),
 		MaxUsers:      int(cmd.Uint(FlagMaxUsers)),
@@ -126,22 +128,21 @@ func initApp(ctx context.Context, cmd *cli.Command) (*grpc.Server, *db.Store, *a
 		return nil, nil, nil, err
 	}
 
-	store, err := db.Setup(ctx, cmd.String(FlagDBPath))
-	if err != nil {
-		slog.ErrorContext(ctx, "Unable to setup database", logging.ErrKey, err)
-		return nil, nil, nil, err
-	}
-
-	authMgr, err := auth.NewManager(vault, store.DB, globalConf)
+	db, err := database.Setup(ctx, cmd.String(FlagDBPath))
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	server, authMgr, err := pb.Setup(ctx, store, authMgr, globalConf)
+	authMgr, err := auth.NewManager(vault, database.New(db), globalConf)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	server, queries, err := pb.Setup(ctx, authMgr, globalConf, db)
 	if err != nil {
 		slog.ErrorContext(ctx, "Unable to setup gRPC server", logging.ErrKey, err)
 		return nil, nil, nil, err
 	}
 
-	return server, store, authMgr, nil
+	return server, db, queries, nil
 }

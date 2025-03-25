@@ -4,42 +4,36 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/ChausseBenjamin/rafta/internal/db"
+	"github.com/ChausseBenjamin/rafta/internal/auth"
 	"github.com/ChausseBenjamin/rafta/internal/logging"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
+	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func (s *adminServer) DeleteUser(ctx context.Context, id *m.UUID) (*emptypb.Empty, error) {
-	creds, err := getCreds(ctx)
+	creds, err := auth.GetCreds(ctx, auth.AccessTokenType)
 	if err != nil {
 		return nil, err
 	}
-	if !hasRequiredRole(creds.Roles, allowedAdminRoles) {
-		return nil, status.Error(
-			codes.PermissionDenied,
-			"User does not have the authority to delete another users",
-		)
+
+	if err := s.hasAdminRights(ctx, creds); err != nil {
+		return nil, err
 	}
 
-	cmd := s.store.Common[db.DeleteUser]
-	resp, err := cmd.ExecContext(ctx, id.Value)
+	userID, err := uuid.Parse(id.Value)
 	if err != nil {
-		slog.ErrorContext(ctx, "Admin request to delete user failed",
-			logging.ErrKey, err,
-			db.RespMsgKey, resp,
-		)
-		return nil, status.Errorf(codes.Internal,
-			"An error occured deleting user '%s'", id.Value,
-		)
+		slog.ErrorContext(ctx, "Failed to parse user ID", logging.ErrKey, err)
+		return nil, status.Error(codes.InvalidArgument, "Invalid target user ID")
 	}
-	if i, err := resp.RowsAffected(); i == 0 && err == nil {
-		return nil, status.Errorf(codes.NotFound,
-			"User '%s' does not exist in the database", id.Value,
-		)
+
+	if err := s.db.DeleteUser(ctx, userID); err != nil {
+		slog.ErrorContext(ctx, "Failure during user deletion", logging.ErrKey, err)
+		return nil, status.Error(codes.Internal, "Failed to delete user")
 	}
-	slog.InfoContext(ctx, "deleted user", db.RespMsgKey, resp)
+
+	slog.InfoContext(ctx, "success", "user_id", creds.UserID)
 	return &emptypb.Empty{}, nil
 }
