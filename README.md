@@ -83,6 +83,17 @@ be implemented.
 The centerpiece is the server itself so but as it's development matures, I will
 try and develop a client in Neovim as well as a mobile client.
 
+# Dependencies & Setup
+
+- Go (duh)
+- [sqlc](https://docs.sqlc.dev/en/stable/overview/install.html) for code generation from SQL queries
+- [protoc](https://protobuf.dev/installation) for code generation around protobuf
+- [make](https://www.gnu.org/software/make/) to automate build steps
+
+Afterwards, running `make setup` followed by `make codegen` will get you most
+of the way there ;)
+
+
 ## Roadmap
 
 - [X] Blank Database Initialization
