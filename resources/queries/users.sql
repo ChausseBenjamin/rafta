@@ -87,6 +87,11 @@ set salt = ?, hash = ?
 where user_id = ?
 ;
 
+-- name: UpdateUserModified :one
+update users
+set updated_at = CURRENT_TIMESTAMP
+returning updated_at;
+
 -- name: UpdateUser :one
 update users
 set name = ?, email = ?, updated_at = CURRENT_TIMESTAMP

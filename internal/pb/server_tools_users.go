@@ -62,7 +62,6 @@ func (s *protoServer) newUser(ctx context.Context, req *m.UserSignupRequest) (*m
 		return nil, status.Error(codes.Internal, "Failed to begin user creation")
 	}
 	defer tx.Rollback()
-
 	db := s.db.WithTx(tx)
 
 	user, err := db.NewUser(ctx, database.NewUserParams{
@@ -151,4 +150,68 @@ func (s *protoServer) updateUser(ctx context.Context, userID uuid.UUID, data *m.
 		}
 	}
 	return timestamppb.New(updated.UTC()), nil
+}
+
+func (s *protoServer) updateUserCredentials(
+	ctx context.Context,
+	userID uuid.UUID,
+	passwd string,
+) (*timestamppb.Timestamp, error) {
+	if err := s.auth.ValidatePasswd(passwd); err != nil {
+		return nil, err
+	}
+
+	hash, salt, err := sec.GenerateHash(passwd)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failure to hash user password", logging.ErrKey, err)
+		return nil, status.Errorf(codes.Internal,
+			"Couldn't create a hash for user authentication",
+		)
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to begin transaction",
+			"user_id", userID,
+			logging.ErrKey, err,
+		)
+		return nil, status.Error(codes.Internal,
+			"failed to start credentials update",
+		)
+	}
+	defer tx.Rollback()
+	db := s.db.WithTx(tx)
+
+	if err := db.UpdateUserSecret(ctx, database.UpdateUserSecretParams{
+		UserID: userID,
+		Salt:   salt,
+		Hash:   hash,
+	}); err != nil {
+		slog.ErrorContext(ctx, "failure during credentials update",
+			"user_id", userID,
+			logging.ErrKey, err,
+		)
+		return nil, status.Error(codes.Internal, "failed to update credentials")
+	}
+
+	modified, err := db.UpdateUserModified(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx,
+			"failed to update 'last_modified' state for user",
+			logging.ErrKey, err,
+		)
+		return nil, status.Error(codes.Internal,
+			"failed to update user metadata. aborting",
+		)
+	}
+
+	if err := tx.Commit(); err != nil {
+		slog.ErrorContext(ctx,
+			"failure to commit credentials update transaction",
+			logging.ErrKey, err,
+		)
+		return nil, status.Error(codes.Internal, "failed to complete credentials update")
+	}
+
+	return timestamppb.New(modified.UTC()), nil
 }

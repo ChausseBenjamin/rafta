@@ -5,9 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/ChausseBenjamin/rafta/internal/auth"
-	"github.com/ChausseBenjamin/rafta/internal/database"
 	"github.com/ChausseBenjamin/rafta/internal/logging"
-	"github.com/ChausseBenjamin/rafta/internal/sec"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
@@ -31,25 +29,8 @@ func (s *adminServer) UpdateCredentials(ctx context.Context, req *m.ChangePasswd
 		return nil, status.Error(codes.InvalidArgument, "Invalid target user ID")
 	}
 
-	if err := s.auth.ValidatePasswd(req.Secret); err != nil {
+	if _, err := s.updateUserCredentials(ctx, userID, req.Secret); err != nil {
 		return nil, err
-	}
-
-	hash, salt, err := sec.GenerateHash(req.Secret)
-	if err != nil {
-		slog.ErrorContext(ctx, "Failure to hash user password", logging.ErrKey, err)
-		return nil, status.Errorf(codes.Internal,
-			"Couldn't create a hash for user authentication",
-		)
-	}
-
-	if err := s.db.UpdateUserSecret(ctx, database.UpdateUserSecretParams{
-		UserID: userID,
-		Salt:   salt,
-		Hash:   hash,
-	}); err != nil {
-		slog.ErrorContext(ctx, "Failure during user credentials update", logging.ErrKey, err)
-		return nil, status.Error(codes.Internal, "Failed to update credentials")
 	}
 
 	slog.InfoContext(ctx, "success", "user_id", creds.UserID)

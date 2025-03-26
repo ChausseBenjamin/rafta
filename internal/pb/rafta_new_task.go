@@ -32,7 +32,6 @@ func (s *raftaServer) NewTask(ctx context.Context, t *m.TaskData) (*m.NewTaskRes
 		)
 	}
 	defer tx.Rollback()
-
 	db := s.db.WithTx(tx)
 
 	task, err := db.NewTask(ctx, database.NewTaskParams{
@@ -78,7 +77,6 @@ func (s *raftaServer) NewTask(ctx context.Context, t *m.TaskData) (*m.NewTaskRes
 			"failed to properly complete task creation",
 		)
 	}
-	tx = nil
 
 	// cleanup shouldn't block the transaction as it's just housekeeping. That's
 	// why it's done outside of syncTags and after the transaction completes
