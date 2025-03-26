@@ -37,32 +37,36 @@ func (q *Queries) CleanupExpiredToken(ctx context.Context, tokenID uuid.UUID) er
 				"An error occurred cleaning up an expired token",
 				logging.ErrKey, err,
 			)
+			return err
+		} else {
+			log.InfoContext(ctx, "cleaned up already expired token")
 		}
-		return err
 	}
 
 	timer := time.NewTimer(time.Until(token.Expiry) + revocationCacheGrace)
 	go func() {
 		defer timer.Stop()
 		<-timer.C
-		err := q.CleanRevokedToken(ctx, tokenID)
+		// cleanup SQL command isn't context dependent (shouldn't fail if context
+		// is expired). Context is only used to know where a deletetion request
+		// originated from in logs.
+		err := q.CleanRevokedToken(context.Background(), tokenID)
 		if err != nil {
 			log.ErrorContext(ctx,
 				"An error occurred cleaning up an expired token",
 				logging.ErrKey, err,
 			)
+			return
 		}
-		log.InfoContext(ctx,
-			"Revoked token is now expired, cleaning from database",
-		)
+		log.InfoContext(ctx, "Revoked token now expired: removed it from database")
 	}()
-
 	return nil
 }
 
-// TokenCleanupProcess retrieves all revoked tokens and runs CleanupExpiredToken for each one.
-// This is meant to be run at startup to ensure the database doesn't get clogged up with
-// revoked tokens that are expired anyways.
+// TokenCleanupProcess retrieves all revoked tokens and runs
+// CleanupExpiredToken for each one. This is meant to be run at startup to
+// ensure the database doesn't get clogged up with revoked tokens that are
+// expired anyways.
 func (q *Queries) tokenCleanupProcess(ctx context.Context) error {
 	tokens, err := q.GetAllRevokedTokens(ctx)
 	if err != nil {
