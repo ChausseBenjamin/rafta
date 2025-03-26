@@ -31,17 +31,24 @@ func (s *raftaServer) DeleteTask(ctx context.Context, task *m.UUID) (*emptypb.Em
 		)
 	}
 
-	if err := s.db.DeleteUserTask(ctx, database.DeleteUserTaskParams{
+	rowCount, err := s.db.DeleteUserTask(ctx, database.DeleteUserTaskParams{
 		Owner: creds.UserID,
 		Task:  taskID,
-	}); err != nil {
+	})
+	if err != nil {
 		slog.ErrorContext(ctx, "failed to delete task",
 			logging.ErrKey, err,
 		)
-		// TODO: differentiate between NotFound and Internal error type
 		return nil, status.Error(
 			codes.Internal,
 			"failed to delete task",
+		)
+	}
+	if rowCount == 0 {
+		slog.WarnContext(ctx, "no task got deleted")
+		return nil, status.Errorf(
+			codes.NotFound,
+			"couldn't find task '%v' to delete it", taskID,
 		)
 	}
 
