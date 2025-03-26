@@ -11,6 +11,7 @@ mkdir -p "$localsecrets" || exit 1
 mkdir -p "$localruntime" || exit 1
 [ -f "$localruntime/.gitignore" ] || echo '*' > "$localruntime/.gitignore"
 
+# Values here are not production ready, they are meant to ease development
 env_vars=$(cat << EOF
   LOG_LEVEL=debug
   LOG_FORMAT=plain
@@ -20,7 +21,7 @@ env_vars=$(cat << EOF
   GRACEFUL_TIMEOUT=200ms
   SECRETS_PATH=$localsecrets
   JWT_ACCESS_TTL=720h
-  JWT_REFRESH_TTL=720h
+  JWT_REFRESH_TTL=1m
 EOF
 )
 
