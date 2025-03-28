@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ChausseBenjamin/rafta/internal/logging"
 	"github.com/ChausseBenjamin/rafta/internal/sec"
+	"github.com/ChausseBenjamin/rafta/internal/util"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -32,20 +34,19 @@ type pragmaConstraint struct {
 	value  string
 }
 
-var preConditions = [...]pragmaConstraint{
+var preConditions = []pragmaConstraint{
 	{"busy_timeout", "10000"},
 	{"journal_mode", "WAL"},
 	{"journal_size_limit", "200000000"},
 	{"synchronous", "NORMAL"},
 	{"foreign_keys", "ON"},
 	{"temp_store", "MEMORY"},
-	{"cache_size", "-16000"},
 }
 
 // Setup opens the SQLite DB at path, verifies its integrity and schema,
 // and returns the valid DB handle. If any check fails, it backs up the old
 // file and reinitializes the DB using the schema definitions.
-func Setup(ctx context.Context, path string) (*sql.DB, error) {
+func Setup(ctx context.Context, path string, cfg *util.ConfigStore) (*sql.DB, error) {
 	slog.DebugContext(ctx, "Setting up database connection")
 	var (
 		db    *sql.DB
@@ -72,6 +73,9 @@ func Setup(ctx context.Context, path string) (*sql.DB, error) {
 	}
 
 	// Ensure every PRAGMA condition is met (
+	preConditions = append(preConditions, pragmaConstraint{
+		"cache_size", strconv.Itoa(cfg.DBCacheSize),
+	})
 	for _, cond := range preConditions {
 		res, err = db.ExecContext(ctx,
 			fmt.Sprintf("PRAGMA %s = %s;", cond.pragma, cond.value),

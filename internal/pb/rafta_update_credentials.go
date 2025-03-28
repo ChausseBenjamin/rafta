@@ -15,11 +15,11 @@ func (s *raftaServer) UpdateCredentials(ctx context.Context, req *m.PasswdMessag
 		return nil, err
 	}
 
-	modified, err := s.updateUserCredentials(ctx, creds.UserID, req.Secret)
+	modified, err := s.updateUserCredentials(ctx, creds.Subject, req.Secret)
 	if err != nil {
 		return nil, err
 	}
 
-	slog.InfoContext(ctx, "success", "user_id", creds.UserID)
+	slog.InfoContext(ctx, "success", "user_id", creds.Subject)
 	return modified, nil
 }

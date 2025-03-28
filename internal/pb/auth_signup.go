@@ -13,7 +13,7 @@ import (
 
 const msgNoNewUser = "The server is not accepting new users at this time. If you are and administrator and wish to circumvent this, please use the 'Admin/CreateUser' endpoint"
 
-func (s *authServer) Signup(ctx context.Context, req *m.UserSignupRequest) (*m.SignupResponse, error) {
+func (s *authServer) Signup(ctx context.Context, req *m.UserSignupRequest) (*m.LoginResponse, error) {
 	if !s.cfg.AllowNewUsers {
 		slog.WarnContext(ctx,
 			"Blocked signup attempt as public signups are currently closed",
@@ -59,7 +59,8 @@ func (s *authServer) Signup(ctx context.Context, req *m.UserSignupRequest) (*m.S
 		)
 	}
 
-	acess, refresh, err := s.auth.Issue(userID, user.Metadata.Roles)
+	// Publicly signed up users don't have roles such as admin
+	acess, refresh, err := s.auth.Issue(userID, []string{})
 	if err != nil {
 		slog.ErrorContext(ctx,
 			"Failed to generate JWT pair",
@@ -69,7 +70,7 @@ func (s *authServer) Signup(ctx context.Context, req *m.UserSignupRequest) (*m.S
 	}
 
 	slog.InfoContext(ctx, "success", "user_id", user.Id)
-	return &m.SignupResponse{
+	return &m.LoginResponse{
 		User: user,
 		Tokens: &m.JWT{
 			Access:  acess,

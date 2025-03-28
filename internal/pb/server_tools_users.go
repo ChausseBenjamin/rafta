@@ -90,21 +90,10 @@ func (s *protoServer) newUser(ctx context.Context, req *m.UserSignupRequest) (*m
 		return nil, status.Error(codes.Internal, "Failed to complete user creation")
 	}
 
-	return &m.User{
-		Id: &m.UUID{Value: user.UserID.String()},
-		Data: &m.UserData{
-			Name:  user.Name,
-			Email: user.Email,
-		},
-		Metadata: &m.UserMetadata{
-			Roles:     nil, // New users don't have any roles (don't bother fetching)
-			CreatedOn: timestamppb.New(user.CreatedAt.UTC()),
-			UpdatedOn: timestamppb.New(user.UpdatedAt.UTC()),
-		},
-	}, nil
+	return userToPb(user), nil
 }
 
-func (s *adminServer) hasAdminRights(ctx context.Context, creds *auth.Claims) error {
+func (s *adminServer) hasAdminRights(ctx context.Context, creds *auth.Credendials) error {
 	isAuthorized := false
 	for _, acceptedRole := range adminRoles {
 		if slices.Contains(creds.Roles, acceptedRole) {
@@ -214,4 +203,18 @@ func (s *protoServer) updateUserCredentials(
 	}
 
 	return timestamppb.New(modified.UTC()), nil
+}
+
+func userToPb(u database.User) *m.User {
+	return &m.User{
+		Id: &m.UUID{Value: u.UserID.String()},
+		Data: &m.UserData{
+			Name:  u.Name,
+			Email: u.Email,
+		},
+		Metadata: &m.UserMetadata{
+			CreatedOn: timestamppb.New(u.CreatedOn.UTC()),
+			UpdatedOn: timestamppb.New(u.UpdatedOn.UTC()),
+		},
+	}
 }

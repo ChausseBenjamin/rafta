@@ -49,7 +49,7 @@ func (s *raftaServer) NewTask(ctx context.Context, t *m.TaskData) (*m.NewTaskRes
 			Valid:  (t.Recurrence.Pattern != ""),
 		},
 		RecurrenceEnabled: t.Recurrence.Active,
-		Owner:             creds.UserID,
+		Owner:             creds.Subject,
 	})
 	if err != nil {
 		slog.ErrorContext(ctx,
@@ -86,8 +86,8 @@ func (s *raftaServer) NewTask(ctx context.Context, t *m.TaskData) (*m.NewTaskRes
 	return &m.NewTaskResponse{
 		Id: &m.UUID{Value: task.TaskID.String()},
 		Metadata: &m.TaskMetadata{
-			CreatedOn: timestamppb.New(task.CreatedAt.UTC()),
-			UpdatedOn: timestamppb.New(task.UpdatedAt.UTC()),
+			CreatedOn: timestamppb.New(task.CreatedOn.UTC()),
+			UpdatedOn: timestamppb.New(task.UpdatedOn.UTC()),
 		},
 	}, nil
 }

@@ -8,6 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/mattn/go-sqlite3 v1.14.24
+	github.com/nullism/bqb v1.7.4
 	github.com/urfave/cli-docs/v3 v3.0.0-alpha6
 	github.com/urfave/cli/v3 v3.0.0-beta1
 	golang.org/x/crypto v0.30.0

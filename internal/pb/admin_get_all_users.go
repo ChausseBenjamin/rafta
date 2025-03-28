@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (s *adminServer) GetAllUsers(ctx context.Context, _ *emptypb.Empty) (*m.UserList, error) {
@@ -32,33 +31,10 @@ func (s *adminServer) GetAllUsers(ctx context.Context, _ *emptypb.Empty) (*m.Use
 	allUsersPb := make([]*m.User, len(allUsers))
 
 	for i, u := range allUsers {
-		roles, err := s.db.GetUserRoles(ctx, u.UserID)
-		if err != nil {
-			slog.ErrorContext(ctx,
-				"Failed to query roles for a specific user",
-				"user_id", u.UserID,
-				logging.ErrKey, err,
-			)
-			return nil, status.Errorf(codes.Internal,
-				"Failed to query roles for user '%v'", u.UserID,
-			)
-		}
-
-		allUsersPb[i] = &m.User{
-			Id: &m.UUID{Value: u.UserID.String()},
-			Data: &m.UserData{
-				Name:  u.Name,
-				Email: u.Email,
-			},
-			Metadata: &m.UserMetadata{
-				Roles:     roles,
-				CreatedOn: timestamppb.New(u.CreatedAt.UTC()),
-				UpdatedOn: timestamppb.New(u.UpdatedAt.UTC()),
-			},
-		}
+		allUsersPb[i] = userToPb(u)
 	}
 
-	slog.InfoContext(ctx, "success", "user_id", creds.UserID)
+	slog.InfoContext(ctx, "success", "user_id", creds.Subject)
 	return &m.UserList{
 		Users: allUsersPb,
 	}, nil

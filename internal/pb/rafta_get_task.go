@@ -33,7 +33,7 @@ func (s *raftaServer) GetTask(ctx context.Context, id *m.UUID) (*m.Task, error) 
 
 	task, err := s.db.GetUserTask(ctx, database.GetUserTaskParams{
 		TaskID: taskID,
-		Owner:  creds.UserID,
+		Owner:  creds.Subject,
 	})
 	if err != nil {
 		slog.ErrorContext(ctx,

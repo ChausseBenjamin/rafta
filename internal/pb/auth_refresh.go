@@ -8,7 +8,6 @@ import (
 	"github.com/ChausseBenjamin/rafta/internal/database"
 	"github.com/ChausseBenjamin/rafta/internal/logging"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
-	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -20,21 +19,8 @@ func (s *authServer) Refresh(ctx context.Context, _ *emptypb.Empty) (*m.JWT, err
 		return nil, err
 	}
 
-	tokenID, err := uuid.Parse(creds.ID)
-	if err != nil {
-		slog.ErrorContext(ctx,
-			"failed to parse refresh token id",
-			"token", tokenID,
-			logging.ErrKey, err,
-		)
-		// Internal error since token was successfully parse in the interceptor
-		return nil, status.Error(codes.Internal,
-			"Failed to parse refresh token id",
-		)
-	}
-
 	err = s.db.RevokeToken(ctx, database.RevokeTokenParams{
-		TokenID: tokenID,
+		TokenID: creds.ID,
 		Expiry:  creds.ExpiresAt.Time.UTC(),
 	})
 	if err != nil {
@@ -43,7 +29,7 @@ func (s *authServer) Refresh(ctx context.Context, _ *emptypb.Empty) (*m.JWT, err
 			"failed to revoke refresh token. Operation aborted",
 		)
 	}
-	if err := s.db.CleanupExpiredToken(ctx, tokenID); err != nil {
+	if err := s.db.CleanupExpiredToken(ctx, creds.ID); err != nil {
 		// Non-critical, clients shouldn't be blocked by housekeeping errors
 		slog.WarnContext(ctx, "Failed to schedule token deletion after expiry",
 			logging.ErrKey, err,
@@ -51,7 +37,7 @@ func (s *authServer) Refresh(ctx context.Context, _ *emptypb.Empty) (*m.JWT, err
 	}
 
 	// No need to fetch the database, roles are already provided
-	access, refresh, err := s.auth.Issue(creds.UserID, creds.Roles)
+	access, refresh, err := s.auth.Issue(creds.Subject, creds.Roles)
 	if err != nil {
 		slog.ErrorContext(ctx,
 			"failed to issue a JWT pair",
@@ -60,7 +46,7 @@ func (s *authServer) Refresh(ctx context.Context, _ *emptypb.Empty) (*m.JWT, err
 		return nil, status.Error(codes.Internal, "JWT generation failed")
 	}
 
-	slog.InfoContext(ctx, "success", "user_id", creds.UserID)
+	slog.InfoContext(ctx, "success", "user_id", creds.Subject)
 	return &m.JWT{
 		Access:  access,
 		Refresh: refresh,

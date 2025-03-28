@@ -30,6 +30,7 @@ const (
 	FlagMaxPasswdLen     = "max-password-length"
 	FlagAccessTokenTTL   = "access-token-time-to-live"
 	FlagRefreshTokenTTL  = "refresh-token-time-to-live"
+	FlagDBCacheSize      = "database-cache-size"
 )
 
 func flags() []cli.Flag {
@@ -80,6 +81,12 @@ func flags() []cli.Flag {
 			Sources: cli.EnvVars("GRACEFUL_TIMEOUT"),
 		}, // }}}
 		// Database {{{
+		&cli.UintFlag{
+			Name:    FlagDBCacheSize,
+			Value:   16000,
+			Usage:   "Database cache to keep in memory (MB)",
+			Sources: cli.EnvVars("DATABASE_CACHE_SIZE"),
+		},
 		&cli.StringFlag{
 			Name:    FlagDBPath,
 			Aliases: []string{"d"},
