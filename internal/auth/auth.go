@@ -35,9 +35,9 @@ const (
 )
 
 var (
-	errTokenAlg     = errors.New("Received token uses an unsupported signing method")
-	privKeyStoreErr = errors.New("failed to store private key in vault")
-	pubKeyStoreErr  = errors.New("failed to store public key in vault")
+	errTokenAlg     = errors.New("received token uses an unsupported signing method")
+	errPrivKeyStore = errors.New("failed to store private key in vault")
+	errPubKeyStore  = errors.New("failed to store public key in vault")
 )
 
 type AuthManager struct {
@@ -297,10 +297,10 @@ func NewManager(vault secrets.SecretVault, db *database.Queries, cfg *util.Confi
 
 		// Store the keys in the vault
 		if err := vault.Set("server-pubkey", secrets.Secret(publicKey)); err != nil {
-			return nil, pubKeyStoreErr
+			return nil, errPubKeyStore
 		}
 		if err := vault.Set("server-privkey", secrets.Secret(privateKey)); err != nil {
-			return nil, privKeyStoreErr
+			return nil, errPrivKeyStore
 		}
 
 		pubkey = secrets.Secret(publicKey)
