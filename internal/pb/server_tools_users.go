@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"net/mail"
 	"slices"
 	"strings"
 
@@ -23,6 +24,10 @@ import (
 )
 
 func (s *protoServer) newUser(ctx context.Context, req *m.UserSignupRequest) (*m.User, error) {
+	if err := validateEmail(ctx, req.User.Email); err != nil {
+		return nil, err
+	}
+
 	emailExists, err := s.db.UserWithEmailExists(ctx, req.User.Email)
 	if err != nil {
 		slog.ErrorContext(ctx,
@@ -120,6 +125,10 @@ func (s *adminServer) hasAdminRights(ctx context.Context, creds *auth.Claims) er
 }
 
 func (s *protoServer) updateUser(ctx context.Context, userID uuid.UUID, data *m.UserData) (*timestamppb.Timestamp, error) {
+	if err := validateEmail(ctx, data.Email); err != nil {
+		return nil, err
+	}
+
 	updated, err := s.db.UpdateUser(ctx, database.UpdateUserParams{
 		UserID: userID,
 		Name:   data.Name,
@@ -214,4 +223,16 @@ func (s *protoServer) updateUserCredentials(
 	}
 
 	return timestamppb.New(modified.UTC()), nil
+}
+
+func validateEmail(ctx context.Context, email string) error {
+	if _, err := mail.ParseAddress(email); err != nil {
+		slog.WarnContext(ctx, "provided email is not valid",
+			logging.ErrKey, err,
+		)
+		return status.Error(codes.InvalidArgument,
+			"failed to parse provided email. Ensure it is in a valid format",
+		)
+	}
+	return nil
 }

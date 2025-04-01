@@ -30,7 +30,7 @@ func (h ctxTracker) WithGroup(name string) slog.Handler {
 	return h.next.WithGroup(name)
 }
 
-func withTrackedContext(current slog.Handler, ctxKey interface{}, logKey string) *ctxTracker {
+func withTrackedContext(current slog.Handler, ctxKey any, logKey string) *ctxTracker {
 	return &ctxTracker{
 		ctxKey: ctxKey,
 		logKey: logKey,
