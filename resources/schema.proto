@@ -5,173 +5,253 @@ import "protobuf/src/google/protobuf/timestamp.proto";
 
 option go_package = "github.com/ChausseBenjamin/rafta/pkg/model";
 
+// Represents a universally unique identifier (UUID) used to identify both
+// users and tasks.
 message UUID {
   string value = 1;
 }
 
+// Represents the possible states of a task.
 enum TaskState {
-  UNSPECIFIED = 0;
+  UNSPECIFIED = 0; // Recommended by protobuf
   PENDING     = 1;
   ONGOING     = 2;
   DONE        = 3;
   BLOCKED     = 4;
 }
 
+// When updating tasks, it is wasteful to send information that hasn't
+// changed (especially the description which is an entire markdown file.
+// Include in update requests the list of all fields that need changing
+// using this enum to identify each field.
 enum TaskFieldMask {
-  TITLE      = 0;
-  DESC       = 1;
-  PRIORITY   = 2;
-  STATE      = 3;
-  RECURRENCE = 4;
-  CREATED    = 5;
-  UPDATED    = 6;
-  TAGS       = 7;
+  TITLE      = 0; // Binds to TaskData.title
+  DESC       = 1; // Binds to TaskData.desc
+  PRIORITY   = 2; // Binds to TaskData.priority
+  STATE      = 3; // Binds to TaskData.state
+  RECURRENCE = 4; // Binds to TaskData.recurrence
+  TAGS       = 7; // Binds to TaskData.tags
 }
 
+// Non-sensitive editable information about a user
 message UserData {
   string name  = 1;
   string email = 2;
 }
 
-message UserMetadata {
-  repeated string           roles      = 1;
-  google.protobuf.Timestamp created_on = 2;
-  google.protobuf.Timestamp updated_on = 3;
+message UserRoles {
+  repeated string roles = 1;
 }
 
+message UpdateUserRolesRequest {
+  UUID            user_id = 1;
+  repeated string roles   = 2;
+}
+
+// Information about a user that is not directly under his control.
+// Roles aren't included here as they are part of any JWT.
+message UserMetadata {
+  // Timestamp when the user was created.
+  google.protobuf.Timestamp created_on = 1;
+  // Timestamp when the user's info was last updated.
+  // This only relates to name, username, password
+  // (creating/editing/deleteting doesn't affect this).
+  google.protobuf.Timestamp updated_on = 2;
+}
+
+// Represents a user with his associated data and metadata.
 message User {
   UUID         id       = 1;
   UserData     data     = 2;
   UserMetadata metadata = 3;
 }
 
+// Represents task the recurrence
+// WIP: a custom library will be developed to generate recurrence
+// instructions in the context of a tasks application.
 message TaskRecurrence {
+  // Parseable recurrence pattern (ex: cron expression)
   string pattern = 1;
+  // Whether the task is currently recurring. If not, a new task doesn't get
+  // automatically created upon completion.
   bool   active  = 2;
 }
 
+// Represents the data associated with a task.
 message TaskData {
-  string                    title         = 1;
-  string                    desc          = 2; // markdown
-  // Intentionally vague for flexible client implementation:
-  // 0=undefined, 1=highest, 0xFFFFFFFF=lowest
-  uint32                    priority      = 3;
-  TaskState                 state         = 4;
-  TaskRecurrence            recurrence    = 5;
-  google.protobuf.Timestamp do_date       = 7;
-  google.protobuf.Timestamp due_date      = 8;
-  repeated string           tags          = 9;
+  string                    title      = 1; // Task title.
+  string                    desc       = 2; // Task description in markdown format.
+  uint32                    priority   = 3; // Task priority (0=undefined, 1=highest, 0xFFFFFFFF=lowest).
+  TaskState                 state      = 4; // Current state of the task.
+  TaskRecurrence            recurrence = 5; // Recurrence details of the task.
+  google.protobuf.Timestamp do_date    = 7; // Date when the task should be started.
+  google.protobuf.Timestamp due_date   = 8; // Deadline for the task.
+  repeated string           tags       = 9; // Tags associated with the task.
 }
 
+// Represents metadata associated with a task.
 message TaskMetadata {
-  google.protobuf.Timestamp created_on    = 1;
-  google.protobuf.Timestamp updated_on    = 2;
+  google.protobuf.Timestamp created_on    = 1; // Timestamp when the task was created.
+  google.protobuf.Timestamp updated_on    = 2; // Timestamp when the task was last updated.
 }
 
-
+// Represents a request to update a task.
 message TaskUpdateRequest {
-  UUID                   id    = 1;
-  TaskData               data  = 2;
-  repeated TaskFieldMask masks = 3;
+  UUID                   id    = 1; // Unique identifier of the task to update.
+  TaskData               data  = 2; // Updated task data.
+  repeated TaskFieldMask masks = 3; // Fields to update.
 }
 
+// Represents a response to a task update request.
 message TaskUpdateResponse {
-  TaskData               data  = 1;
-  TaskMetadata           meta  = 2;
-  repeated TaskFieldMask masks = 3;
+	// Only part of the Tasks metadata that changes
+  google.protobuf.Timestamp updated_on = 2;
+	// If the update request marked as complete a recurring task, the new task
+	// resulting from the completion gets sent back to the client.
+	Task                      new_task   = 3;
 }
 
+// Represents a task with associated data and metadata.
 message Task {
-  UUID         id       = 1;
-  TaskData     data     = 2;
-  TaskMetadata metadata = 3;
+  UUID         id       = 1; // Unique identifier for the task.
+  TaskData     data     = 2; // Task data.
+  TaskMetadata metadata = 3; // Metadata about the task.
 }
 
+// Represents the response to creating a new task.
 message NewTaskResponse {
-	UUID         id       = 1;
-	TaskMetadata metadata = 2;
+  // Unique identifier of the newly created task.
+  UUID         id       = 1;
+	// Metadata of the newly created task.
+  TaskMetadata metadata = 2;
 }
 
+// Represents a list of tasks.
 message TaskList {
-  repeated Task tasks = 1;
+  repeated Task tasks = 1; // List of tasks.
 }
 
+// Represents a list of users.
 message UserList {
-  repeated User users = 1;
+  repeated User users = 1; // List of users.
 }
 
+// Represents JSON Web Tokens (JWT) for authentication.
 message JWT {
-  string access  = 1;
-  string refresh = 2;
+  string access  = 1; // Access token.
+  string refresh = 2; // Refresh token.
 }
 
+// Represents the response to a login request.
 message LoginResponse {
-  User user  = 1;
-  JWT tokens = 2;
+  User user  = 1; // Authenticated user.
+  JWT tokens = 2; // Authentication tokens.
 }
 
+// Represents a request to sign up a new user.
 message UserSignupRequest {
-  UserData user     = 1;
-  string userSecret = 2;
+  UserData user      = 1; // Data of the user to sign up.
+  string user_secret = 2; // Secret (e.g., password) for the user.
 }
 
-message SignupResponse {
-  User user  = 1;
-  JWT tokens = 2;
-}
-
+// Represents a request to refresh authentication tokens.
 message RefreshRequest {
-  string refreshToken = 1;
+  string refreshToken = 1; // Refresh token.
 }
 
+// Represents a request to change a user's password.
 message ChangePasswdRequest {
-  UUID   id     = 1;
-  string secret = 2;
+  UUID   id     = 1; // Unique identifier of the user.
+  string secret = 2; // New password.
 }
 
+// Represents a password message.
 message PasswdMessage {
-  string secret = 1;
+  string secret = 1; // Password.
 }
 
-// Accessible to all users only once authenticated
-// Many methods take `.Empty` as an input since users can only
-// query/mutate their own data (which is implied from authentication).
-// Any task involoving another users data is done via the Admin service.
+// Service for user and task management accessible to authenticated users.
 service Rafta {
-  // Retrieval
   rpc GetAllTasks(google.protobuf.Empty) returns (TaskList);
-  rpc GetTask(UUID) returns (Task); // Input: task UUID
+  rpc GetTask(UUID) returns (Task);
   rpc GetUserInfo(google.protobuf.Empty) returns (User);
-
-  // User Manipulation
   rpc DeleteUser(google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc UpdateCredentials(PasswdMessage) returns (google.protobuf.Timestamp);
   rpc UpdateUserInfo(UserData) returns (google.protobuf.Timestamp);
-
-  // Task Manipulation
   rpc NewTask(TaskData) returns (NewTaskResponse);
   rpc DeleteTask(UUID) returns (google.protobuf.Empty);
   rpc UpdateTask(TaskUpdateRequest) returns (TaskUpdateResponse);
-
 }
 
-// Accessible only to users with the admin role
+// Service for administrative operations accessible only to users with the
+// ADMIN role
 service Admin {
-  // Retrieval
+
+  // Retrieves a list of all users in the system. This is useful for admins to
+  // get an overview of the user base or perform bulk operations.
+  //
+  // ***IF YOU'RE A SERVER ADMIN, PLZ BE NICE, DON'T VIOLATE USER PRIVACY***
   rpc GetAllUsers(google.protobuf.Empty) returns (UserList);
+
+  // Retrieves the details of a specific user. This is helpful for admins to
+  // view user information for troubleshooting or auditing purposes.
+  //
+  // ***IF YOU'RE A SERVER ADMIN, PLZ BE NICE, DON'T VIOLATE USER PRIVACY***
   rpc GetUser(UUID) returns (User);
+
+	// GetUserTasks is meant to exist as a debugging tool to troubleshoot if a
+	// users tasks seem broken in some way. It allows a admin to investigate
+	// the issue without impersonating the user.
+	//
+	// ***IF YOU'RE A SERVER ADMIN, PLZ BE NICE, DON'T INVADE PEOPLES PRIVACY***
   rpc GetUserTasks(UUID) returns (TaskList);
 
-  // Manipulation
+	// This is allows the admin of the platform to change a user's passwords.
+	// This is meant as a tool to help users that have lost their password.
+	//
+	// ***IF YOU'RE A SERVER ADMIN, PLZ BE NICE, DON'T LOCK PEOPLE OUT***
   rpc UpdateCredentials(ChangePasswdRequest) returns (google.protobuf.Empty);
+
+  // An admin isn't meant to login as another user therefore no JWT is sent
+	// This is mostly useful for server maintainers that want to create accounts
+	// for friends without enabling public signups.
+	//
+	// ***IF YOU'RE A SERVER ADMIN, PLZ BE NICE, ASK USERS TO UPDATE THEIR CREDS***
   rpc NewUser(UserSignupRequest) returns (google.protobuf.Empty);
+
+  // Deletes a specific user by their UUID. This is meant as a tool for admins to
+  // remove malicious users.
+	//
+	// ***IF YOU'RE A SERVER ADMIN, PLZ BE NICE, DONT DELETE PEOPLE UNWARANTED***
   rpc DeleteUser(UUID) returns (google.protobuf.Empty);
+
+  // Updates the details of a specific user. This is meant to allow admins to
+  // correct user information or update their profiles as needed.
+  //
+  // ***IF YOU'RE A SERVER ADMIN, PLZ BE NICE, DON'T EDIT USERS UNWARANTED***
   rpc UpdateUser(User) returns (google.protobuf.Empty);
 
+	// Since role information is only packaged in JWTs (which an admin can't get
+	// from another user), this is meant to help admins track which users have
+	// special rights.
+	rpc GetUserRoles(UUID) returns (UserRoles);
+
+	// Allows an admin to add other admins to the platform to ease server
+	// management The only moment this will refuse to work is when the only
+	// admin of a server tries to revoke his own role.
+	rpc UpdateUserRoles(UUID) returns (google.protobuf.Empty);
 }
 
+// Service for authentication-related operations.
 service Auth {
-  rpc Signup(UserSignupRequest) returns (SignupResponse);
+  // Signs up a new user (no auth required)
+  rpc Signup(UserSignupRequest) returns (LoginResponse);
+
+  // Logs in an existing user using Basic auth ( ex: base64(username:password) )
+	// providing the user with a pair of JWT (access + refresh)
   rpc Login(google.protobuf.Empty) returns (LoginResponse);
+
+  // Provides a new pair of JWT and revokes the refresh token provided to
+	// make that request.
   rpc Refresh(google.protobuf.Empty) returns (JWT);
 }

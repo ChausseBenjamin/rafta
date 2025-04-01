@@ -5,11 +5,9 @@ import (
 	"log/slog"
 
 	"github.com/ChausseBenjamin/rafta/internal/auth"
-	"github.com/ChausseBenjamin/rafta/internal/logging"
+	"github.com/ChausseBenjamin/rafta/internal/util"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
-	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -23,16 +21,18 @@ func (s *adminServer) UpdateCredentials(ctx context.Context, req *m.ChangePasswd
 		return nil, err
 	}
 
-	userID, err := uuid.Parse(req.Id.Value)
+	userID, err := util.ParseUUID(ctx, util.ParseUUIDParams{
+		Str: req.Id.Value, Subject: "user_id",
+		Critical: true, Implication: codes.InvalidArgument,
+	})
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to parse token ID", logging.ErrKey, err)
-		return nil, status.Error(codes.InvalidArgument, "Invalid target user ID")
+		return nil, err
 	}
 
 	if _, err := s.updateUserCredentials(ctx, userID, req.Secret); err != nil {
 		return nil, err
 	}
 
-	slog.InfoContext(ctx, "success", "user_id", creds.UserID)
+	slog.InfoContext(ctx, "success", "user_id", creds.Subject)
 	return &emptypb.Empty{}, nil
 }

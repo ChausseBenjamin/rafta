@@ -6,8 +6,8 @@ import (
 
 	"github.com/ChausseBenjamin/rafta/internal/auth"
 	"github.com/ChausseBenjamin/rafta/internal/logging"
+	"github.com/ChausseBenjamin/rafta/internal/util"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
-	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -22,16 +22,12 @@ func (s *adminServer) GetUserTasks(ctx context.Context, id *m.UUID) (*m.TaskList
 		return nil, err
 	}
 
-	userID, err := uuid.Parse(id.Value)
+	userID, err := util.ParseUUID(ctx, util.ParseUUIDParams{
+		Str: id.Value, Subject: "user_id",
+		Critical: true, Implication: codes.InvalidArgument,
+	})
 	if err != nil {
-		slog.WarnContext(ctx,
-			"failed to parse provided userID",
-			"user_id", id.Value,
-			logging.ErrKey, err,
-		)
-		return nil, status.Errorf(codes.InvalidArgument,
-			"Failed to parse provided user id. Parser returned '%v'", err,
-		)
+		return nil, err
 	}
 
 	tasks, err := s.db.GetUserTasks(ctx, userID)
@@ -64,7 +60,7 @@ func (s *adminServer) GetUserTasks(ctx context.Context, id *m.UUID) (*m.TaskList
 		tasksPb[i] = taskToPb(task, tags)
 	}
 
-	slog.InfoContext(ctx, "success", "user_id", creds.UserID)
+	slog.InfoContext(ctx, "success", "user_id", creds.Subject)
 	return &m.TaskList{
 		Tasks: tasksPb,
 	}, nil

@@ -22,8 +22,10 @@ env_vars=$(cat << EOF
   SECRETS_PATH=$localsecrets
   JWT_ACCESS_TTL=720h
   JWT_REFRESH_TTL=1m
+  CGO_ENABLED=1
 EOF
 )
+
 
 case "$1" in
   --print-config)

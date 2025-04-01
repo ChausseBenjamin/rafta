@@ -18,7 +18,7 @@ func (s *raftaServer) GetAllTasks(ctx context.Context, _ *emptypb.Empty) (*m.Tas
 		return nil, err
 	}
 
-	tasks, err := s.db.GetUserTasks(ctx, creds.UserID)
+	tasks, err := s.db.GetUserTasks(ctx, creds.Subject)
 	if err != nil {
 		slog.ErrorContext(ctx,
 			"failed to retrieve tasks for given user",

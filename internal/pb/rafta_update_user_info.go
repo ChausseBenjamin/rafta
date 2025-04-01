@@ -15,7 +15,7 @@ func (s *raftaServer) UpdateUserInfo(ctx context.Context, data *m.UserData) (*ti
 		return nil, err
 	}
 
-	modified, err := s.updateUser(ctx, creds.UserID, data)
+	modified, err := s.updateUser(ctx, creds.Subject, data)
 	if err != nil {
 		return nil, err
 	}

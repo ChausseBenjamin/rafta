@@ -89,14 +89,14 @@ where user_id = ?
 
 -- name: UpdateUserModified :one
 update users
-set updated_at = CURRENT_TIMESTAMP
-returning updated_at;
+set updated_on = CURRENT_TIMESTAMP
+returning updated_on;
 
 -- name: UpdateUser :one
 update users
-set name = ?, email = ?, updated_at = CURRENT_TIMESTAMP
+set name = ?, email = ?, updated_on = CURRENT_TIMESTAMP
 where user_id = ?
-returning updated_at
+returning updated_on
 ;
 
 -- name: NewUser :one

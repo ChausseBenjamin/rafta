@@ -12,7 +12,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (s *authServer) Login(ctx context.Context, _ *emptypb.Empty) (*m.LoginResponse, error) {
@@ -21,7 +20,7 @@ func (s *authServer) Login(ctx context.Context, _ *emptypb.Empty) (*m.LoginRespo
 		return nil, err
 	}
 
-	user, err := s.db.GetUser(ctx, creds.UserID)
+	user, err := s.db.GetUser(ctx, creds.Subject)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, status.Error(codes.NotFound, "User not found")
@@ -29,7 +28,7 @@ func (s *authServer) Login(ctx context.Context, _ *emptypb.Empty) (*m.LoginRespo
 		return nil, status.Error(codes.Internal, "Failed to retrieve user info")
 	}
 
-	access, refresh, err := s.auth.Issue(creds.UserID, creds.Roles)
+	access, refresh, err := s.auth.Issue(creds.Subject, creds.Roles)
 	if err != nil {
 		slog.ErrorContext(ctx,
 			"Failure during JWT pair generation",
@@ -40,17 +39,7 @@ func (s *authServer) Login(ctx context.Context, _ *emptypb.Empty) (*m.LoginRespo
 
 	slog.InfoContext(ctx, "success", "user_id", user.UserID)
 	return &m.LoginResponse{
-		User: &m.User{
-			Id: &m.UUID{Value: user.UserID.String()},
-			Data: &m.UserData{
-				Name:  user.Name,
-				Email: user.Email,
-			},
-			Metadata: &m.UserMetadata{
-				CreatedOn: timestamppb.New(user.CreatedAt.UTC()),
-				UpdatedOn: timestamppb.New(user.UpdatedAt.UTC()),
-			},
-		},
+		User: userToPb(user),
 		Tokens: &m.JWT{
 			Access:  access,
 			Refresh: refresh,

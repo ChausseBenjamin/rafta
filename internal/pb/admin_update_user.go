@@ -5,11 +5,9 @@ import (
 	"log/slog"
 
 	"github.com/ChausseBenjamin/rafta/internal/auth"
-	"github.com/ChausseBenjamin/rafta/internal/logging"
+	"github.com/ChausseBenjamin/rafta/internal/util"
 	m "github.com/ChausseBenjamin/rafta/pkg/model"
-	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -23,16 +21,12 @@ func (s *adminServer) UpdateUser(ctx context.Context, user *m.User) (*emptypb.Em
 		return nil, err
 	}
 
-	userID, err := uuid.Parse(user.Id.Value)
+	userID, err := util.ParseUUID(ctx, util.ParseUUIDParams{
+		Str: user.Id.Value, Subject: "user_id",
+		Critical: true, Implication: codes.InvalidArgument,
+	})
 	if err != nil {
-		slog.ErrorContext(ctx,
-			"failed to parse provided user ID",
-			"user_id", user.Id.Value,
-			logging.ErrKey, err,
-		)
-		return nil, status.Error(codes.Internal,
-			"Failed to create a user identifier",
-		)
+		return nil, err
 	}
 
 	_, err = s.updateUser(ctx, userID, user.Data)
@@ -40,6 +34,6 @@ func (s *adminServer) UpdateUser(ctx context.Context, user *m.User) (*emptypb.Em
 		return nil, err
 	}
 
-	slog.InfoContext(ctx, "success", "user_id", creds.UserID)
+	slog.InfoContext(ctx, "success", "user_id", creds.Subject)
 	return &emptypb.Empty{}, nil
 }

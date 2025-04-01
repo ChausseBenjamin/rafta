@@ -25,20 +25,19 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type tokenType string
-
 const (
-	// TODO: Make these configurable through flags/env variables
-	issuer                     = "rafta-server"
+	// TODO: Make this the server url (configurable cli.Flag)
+	issuer = "rafta-server"
+
 	AccessTokenType  tokenType = "access"
 	RefreshTokenType tokenType = "refresh"
 	BasicTokenType   tokenType = "basic"
 )
 
 var (
-	errTokenAlg     = errors.New("Received token uses an unsupported signing method")
-	privKeyStoreErr = errors.New("failed to store private key in vault")
-	pubKeyStoreErr  = errors.New("failed to store public key in vault")
+	errTokenAlg     = errors.New("received token uses an unsupported signing method")
+	errPrivKeyStore = errors.New("failed to store private key in vault")
+	errPubKeyStore  = errors.New("failed to store public key in vault")
 )
 
 type AuthManager struct {
@@ -48,11 +47,20 @@ type AuthManager struct {
 	cfg     *util.ConfigStore
 }
 
+type tokenType string
+
 type Claims struct {
-	UserID uuid.UUID `json:"uuid"`
-	Roles  []string  `json:"roles"`
-	Type   string    `json:"token_type"`
+	Roles []string  `json:"roles"`
+	Type  tokenType `json:"typ"`
 	jwt.RegisteredClaims
+}
+
+// Credendials are what get sent to the protobuf server. This is done to
+// minimize parsing by already having required fields in the uuid.UUID format
+type Credendials struct {
+	Subject uuid.UUID
+	ID      uuid.UUID
+	Claims
 }
 
 // Authenticating returns an interceptor that retrieves a jwt from the header.
@@ -124,13 +132,15 @@ func (a *AuthManager) handleBasicAuth(ctx context.Context, req any, handler grpc
 		roles = []string{}
 	}
 
-	creds := &Claims{
-		UserID: userSecret.UserID,
-		Roles:  roles,
-		Type:   string(BasicTokenType),
+	creds := &Credendials{
+		Subject: userSecret.UserID,
+		Claims: Claims{
+			Roles: roles,
+			Type:  BasicTokenType,
+		},
 	}
 
-	newCtx := context.WithValue(ctx, util.JwtKey, creds)
+	newCtx := context.WithValue(ctx, util.CredsKey, creds)
 	return handler(newCtx, req)
 }
 
@@ -152,15 +162,12 @@ func (a *AuthManager) handleBearerAuth(ctx context.Context, req any, handler grp
 		slog.WarnContext(ctx, "Unable to extract custom claims from JWT")
 		return handler(ctx, req)
 	} else {
-		tokenID, err := uuid.Parse(tokenWithClaims.ID)
+		tokenID, err := util.ParseUUID(ctx, util.ParseUUIDParams{
+			Str: tokenWithClaims.ID, Subject: "jwt_id",
+			Implication: codes.Unauthenticated, Critical: true,
+		})
 		if err != nil {
-			slog.ErrorContext(ctx, "failed to parse uuid from jwt",
-				logging.ErrKey, err,
-			)
-			return nil, status.Error(
-				codes.Internal,
-				"failure while ensuring token isn't revoked",
-			)
+			return nil, err
 		}
 		revoked, err := a.db.TokenIsRevoked(ctx, tokenID)
 		if err != nil {
@@ -178,7 +185,21 @@ func (a *AuthManager) handleBearerAuth(ctx context.Context, req any, handler grp
 			)
 		}
 
-		return handler(context.WithValue(ctx, util.JwtKey, tokenWithClaims), req)
+		userID, err := util.ParseUUID(ctx, util.ParseUUIDParams{
+			Str: tokenWithClaims.Subject, Subject: "jwt_id",
+			Implication: codes.Unauthenticated, Critical: true,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		creds := &Credendials{
+			Subject: userID,
+			ID:      tokenID,
+			Claims:  *tokenWithClaims,
+		}
+
+		return handler(context.WithValue(ctx, util.CredsKey, creds), req)
 	}
 }
 
@@ -191,17 +212,14 @@ func (a *AuthManager) Issue(userID uuid.UUID, roles []string) (string, string, e
 
 	// Create the accessClaims
 	accessClaims := Claims{
-		UserID: userID,
-		Roles:  roles,
-		Type:   string(AccessTokenType),
+		Roles: roles,
+		Type:  AccessTokenType,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    issuer,
 			Subject:   userID.String(),
 			ExpiresAt: jwt.NewNumericDate(now.Add(a.cfg.JWTAccessTTL)),
 			IssuedAt:  jwt.NewNumericDate(now),
 			ID:        accessID.String(),
-
-			// Audience:  []string{},
 		},
 	}
 
@@ -214,9 +232,8 @@ func (a *AuthManager) Issue(userID uuid.UUID, roles []string) (string, string, e
 
 	// Create the refresh token claims
 	refreshClaims := Claims{
-		UserID: userID,
-		Roles:  roles,
-		Type:   string(RefreshTokenType),
+		Roles: roles,
+		Type:  RefreshTokenType,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID.String(),
 			ExpiresAt: jwt.NewNumericDate(now.Add(a.cfg.JWTRefreshTTL)),
@@ -243,10 +260,11 @@ func (a *AuthManager) Issue(userID uuid.UUID, roles []string) (string, string, e
 //
 //	creds, err := auth.GetCreds(ctx, TokenBasicName)
 //	if err != nil {
+//		// err -> pre-formatted for protobuf with status code
 //		return nil, err
 //	}
-func GetCreds(ctx context.Context, expects tokenType) (*Claims, error) {
-	creds := util.GetFromContext[Claims](ctx, util.JwtKey)
+func GetCreds(ctx context.Context, expects tokenType) (*Credendials, error) {
+	creds := util.GetFromContext[Credendials](ctx, util.CredsKey)
 	if creds == nil {
 		slog.WarnContext(ctx,
 			"User is not authenticated, cannot proceed with request",
@@ -255,7 +273,7 @@ func GetCreds(ctx context.Context, expects tokenType) (*Claims, error) {
 			"Current endpoint requires JWT authentication to proceed and found none. Operation aborted",
 		)
 	} else {
-		if creds.Type != string(expects) {
+		if creds.Type != expects {
 			slog.WarnContext(ctx,
 				"User provided the wrong type of token, cannot proceed with request",
 			)
@@ -279,10 +297,10 @@ func NewManager(vault secrets.SecretVault, db *database.Queries, cfg *util.Confi
 
 		// Store the keys in the vault
 		if err := vault.Set("server-pubkey", secrets.Secret(publicKey)); err != nil {
-			return nil, pubKeyStoreErr
+			return nil, errPubKeyStore
 		}
 		if err := vault.Set("server-privkey", secrets.Secret(privateKey)); err != nil {
-			return nil, privKeyStoreErr
+			return nil, errPrivKeyStore
 		}
 
 		pubkey = secrets.Secret(publicKey)

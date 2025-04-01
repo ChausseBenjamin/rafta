@@ -24,6 +24,6 @@ func (s *adminServer) NewUser(ctx context.Context, req *m.UserSignupRequest) (*e
 		return nil, err
 	}
 
-	slog.InfoContext(ctx, "success", "user_id", creds.UserID)
+	slog.InfoContext(ctx, "success", "user_id", creds.Subject)
 	return &emptypb.Empty{}, nil
 }

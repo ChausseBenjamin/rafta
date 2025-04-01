@@ -35,8 +35,8 @@ func taskToPb(t database.Task, tags []database.Tag) *m.Task {
 			},
 		},
 		Metadata: &m.TaskMetadata{
-			CreatedOn: timestamppb.New(t.CreatedAt.UTC()),
-			UpdatedOn: timestamppb.New(t.UpdatedAt.UTC()),
+			CreatedOn: timestamppb.New(t.CreatedOn.UTC()),
+			UpdatedOn: timestamppb.New(t.UpdatedOn.UTC()),
 		},
 	}
 }

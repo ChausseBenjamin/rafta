@@ -121,6 +121,7 @@ func initApp(ctx context.Context, cmd *cli.Command) (*grpc.Server, *sql.DB, *dat
 		MaxPasswdLen:  int(cmd.Uint(FlagMaxPasswdLen)),
 		JWTAccessTTL:  cmd.Duration(FlagAccessTokenTTL),
 		JWTRefreshTTL: cmd.Duration(FlagRefreshTokenTTL),
+		DBCacheSize:   int(-cmd.Uint(FlagDBCacheSize)),
 	}
 
 	vault, err := secrets.NewDirVault(cmd.String(FlagSecretsPath))
@@ -128,7 +129,7 @@ func initApp(ctx context.Context, cmd *cli.Command) (*grpc.Server, *sql.DB, *dat
 		return nil, nil, nil, err
 	}
 
-	db, err := database.Setup(ctx, cmd.String(FlagDBPath))
+	db, err := database.Setup(ctx, cmd.String(FlagDBPath), globalConf)
 	if err != nil {
 		return nil, nil, nil, err
 	}

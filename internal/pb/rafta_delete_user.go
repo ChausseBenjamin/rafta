@@ -17,9 +17,9 @@ func (s *raftaServer) DeleteUser(ctx context.Context, _ *emptypb.Empty) (*emptyp
 		return nil, err
 	}
 
-	if err := s.db.DeleteUser(ctx, creds.UserID); err != nil {
+	if err := s.db.DeleteUser(ctx, creds.Subject); err != nil {
 		slog.ErrorContext(ctx, "failure while trying to delete user",
-			"user_id", creds.UserID,
+			"user_id", creds.Subject,
 			logging.ErrKey, err,
 		)
 		return nil, status.Error(codes.Internal,

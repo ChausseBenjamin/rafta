@@ -32,7 +32,7 @@ func (s *raftaServer) DeleteTask(ctx context.Context, task *m.UUID) (*emptypb.Em
 	}
 
 	rowCount, err := s.db.DeleteUserTask(ctx, database.DeleteUserTaskParams{
-		Owner: creds.UserID,
+		Owner: creds.Subject,
 		Task:  taskID,
 	})
 	if err != nil {
