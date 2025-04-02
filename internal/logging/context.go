@@ -6,7 +6,7 @@ import (
 )
 
 type ctxTracker struct {
-	ctxKey interface{}
+	ctxKey any
 	logKey string
 	next   slog.Handler
 }
