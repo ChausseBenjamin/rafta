@@ -11,7 +11,7 @@ import (
 
 // revocationCacheGrace sets how long a revoked token should remain in the database
 // even though it is expired.
-const revocationCacheGrace = 2 * time.Minute
+const revocationCacheGrace = 30 * time.Second
 
 // CleanupExpiredToken cleans up a revoked token if it is expired.
 // It sets a timer to clean up the token after its expiry plus a grace period.

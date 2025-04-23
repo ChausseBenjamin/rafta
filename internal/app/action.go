@@ -49,6 +49,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			return
 		}
 
+		//nolint:errcheck
 		gracefulShutdown = func() {
 			once.Do(func() { // Ensure brutal shutdown isn't triggered later
 				server.GracefulStop()
@@ -59,6 +60,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			})
 		}
 
+		//nolint:errcheck
 		brutalShutdown = func() {
 			slog.WarnContext(ctx,
 				"Graceful shutdown delay exceeded, shutting down NOW!",

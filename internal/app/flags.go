@@ -140,8 +140,8 @@ func flags() []cli.Flag {
 }
 
 func validateLogOutput(ctx context.Context, cmd *cli.Command, s string) error {
-	switch {
-	case s == "stdout" || s == "stderr":
+	switch s {
+	case "stdout", "stderr":
 		return nil
 	default:
 		// assume file
@@ -153,7 +153,7 @@ func validateLogOutput(ctx context.Context, cmd *cli.Command, s string) error {
 			)
 			return err
 		}
-		defer f.Close()
+		defer f.Close() //nolint:errcheck
 		return nil
 	}
 }

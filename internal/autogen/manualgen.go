@@ -20,6 +20,7 @@ import (
 	docs "github.com/urfave/cli-docs/v3"
 )
 
+//nolint:errcheck
 func main() {
 	a := app.Command()
 

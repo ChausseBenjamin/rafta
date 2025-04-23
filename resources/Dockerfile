@@ -4,11 +4,11 @@ RUN apk update && \
   curl xz
 ARG ZIGVER=0.14.0
 ARG ZIGPKG=zig-linux-x86_64-$ZIGVER
-ARG ZIGURL=https://ziglang.org/builds/${ZIGPKG}.tar.xz
+ARG ZIGURL=https://ziglang.org/download/${ZIGVER}/${ZIGPKG}.tar.xz
 RUN mkdir -p /deps
 WORKDIR /deps
 
-RUN curl ${ZIGURL} -O && \
+RUN curl -L ${ZIGURL} -O && \
   tar xf ${ZIGPKG}.tar.xz && \
   mv ${ZIGPKG}/ local/
 

@@ -324,7 +324,7 @@ func (a *AuthManager) RevokeToken(ctx context.Context, token *Claims) error {
 
 	err = a.db.RevokeToken(ctx, database.RevokeTokenParams{
 		TokenID: tokenID,
-		Expiry:  token.ExpiresAt.Time.UTC(),
+		Expiry:  token.ExpiresAt.UTC(),
 	})
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to revoke token", logging.ErrKey, err)
