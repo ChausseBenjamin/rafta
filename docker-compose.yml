@@ -1,0 +1,18 @@
+---
+services:
+  rafta:
+    build:
+      context: .
+      dockerfile: ./resources/Dockerfile
+    ports: [1157:1157]
+    environment:
+      - LOG_LEVEL=debug
+      - LOG_FORMAT=json
+      - LOG_OUTPUT=stdout
+      - LISTEN_PORT=1157
+      - DATABASE_PATH=/var/run/store.db
+      - GRACEFUL_TIMEOUT=200ms
+      - SECRETS_PATH=/etc/secrets
+      - JWT_ACCESS_TTL=720h
+      - JWT_REFRESH_TTL=1m
+    volumes: [./.runtime:/var/run, ./.secrets:/etc/secrets]
