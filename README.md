@@ -13,6 +13,7 @@
 I mainly want these things in a task management solution:
 
 - Accessible where I already am (come to me not the other way around)
+    - notify rather than require me to open an app
     - neovim plugin
     - good mobile app
 - Timing that just works
@@ -21,8 +22,10 @@ I mainly want these things in a task management solution:
 - No scope creeping
     - Don't try to be a wiki, execute code snippets
 - Extensible (easy to hack on)
+    - Easy to understand/implement API to extend the app rather than it being
+    a monolith
 
-I felt like [with every solution I tried](## Other solutions), there were many
+I felt like with every solution I tried, there were many
 tradeoffs. So I decided to make my own thing with the following
 principles/structure:
 
@@ -34,12 +37,33 @@ principles/structure:
 
 ## Usage & Contributing
 
-This project is far from finished. I haven't created a client that uses this
-server to manage tasks yet. Please look at the Development session of the wiki
-if you wish to try and setup a server for testing and developing your own
-client. If you think something could be done better, feel free to submit a PR.
-Please note however that changes to the grpc specification must have a BIG
-incentive for change as they break compatibility amongst clients.
+Although the server Implementation is mostly done, I haven't created a client
+that uses this server to manage tasks yet (I'm in the very early stages of a
+Neovim plugin). If you would like to implement a client for your usecase, feel
+more than welcome to do so. Although robust scheduling is planned as a feature,
+it is not yet implemented as I want to created my own scheduling engine taking
+inspiration from both cron and Todoist (as weird as this may sound) and release
+it as a standalone library/standard that can be used in more than just this
+app.
+
+```mermaid
+flowchart LR
+    client(Rafta Client)
+    srv[Rafta Server]
+    db([SQLite Database])
+
+    client-- gRPC request -->srv
+    srv-- Query/Update/Delete -->db
+
+    db-- Response -->srv
+    srv-- gRPC response -->client
+```
+
+Note that authentication is done using [JWT][11] and tokens can be requested
+via the gRPC Auth endpoint (which implies you should use https at all times
+with this service).The entire gRPC spec to develop a client is inside
+`resources/schema.proto` and is fairly well documented. A docker-compose file
+also provided to help with quickly setting up a development server.
 
 ## Client ideas
 
@@ -52,8 +76,8 @@ Here are some clients I am thinking about building:
 **Calendar Server**: A client that runs with admin privileges and generates and
 hosts [iCal][9] links for users that require them via an api (or a frontend).
 It could be possible to revoke/re-generate an iCal url if it gets leaked.
-Another neat feature would be to generate calendars based on tag filters (maybe
-even embedding them in the links as some sort of rest API).
+Another neat feature would be to generate calendars based on tag filters, maybe
+even embedding them in the links as some sort of rest API (ex: `https://rafta.net/user-token?minpriority=3&labels=math,exam`).
 
 
 **Neovim Plugin**: I do all my work in neovim and my fingers are used to the
@@ -121,3 +145,4 @@ also.
 [8]: https://xkcd.com/927
 [9]: https://en.wikipedia.org/wiki/ICalendar
 [10]: https://github.com/stevearc/oil.nvim
+[11]: https://jwt.io/introduction
