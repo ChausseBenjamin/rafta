@@ -44,7 +44,7 @@ func (s *raftaServer) UpdateTask(ctx context.Context, req *m.TaskUpdateRequest) 
 	}
 	defer tx.Rollback()
 
-	q := bqb.New("update tasks set updated_at = CURRENT_TIMESTAMP")
+	q := bqb.New("update tasks set updated_on = CURRENT_TIMESTAMP")
 	masks := removeDuplicate(req.Masks)
 	for _, mask := range masks {
 		switch mask {
@@ -68,15 +68,9 @@ func (s *raftaServer) UpdateTask(ctx context.Context, req *m.TaskUpdateRequest) 
 	}
 
 	query, args, err := q.Concat(` where task_id = ? and owner = ? returning
-		title,
-		state,
-		priority,
-		description,
-		due_date,
-		do_date,
 		recurrence_pattern,
 		recurrence_enabled,
-		updated_on;`, req.Id, creds.ID,
+		updated_on;`, req.Id.Value, creds.Subject,
 	).ToSql()
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to build query",
@@ -85,9 +79,34 @@ func (s *raftaServer) UpdateTask(ctx context.Context, req *m.TaskUpdateRequest) 
 		return nil, status.Error(codes.Internal, "failed to build task update")
 	}
 
+	slog.InfoContext(ctx, "executing update query",
+		"query", query,
+		"task_id", req.Id.Value,
+		"owner_id", creds.Subject,
+	)
+
+	// Debug: Check if task exists and who owns it
+	var existingOwner string
+	checkQuery := "SELECT owner FROM tasks WHERE task_id = ?"
+	if err := tx.QueryRowContext(ctx, checkQuery, req.Id.Value).Scan(&existingOwner); err != nil {
+		if err == sql.ErrNoRows {
+			slog.WarnContext(ctx, "task not found", "task_id", req.Id.Value)
+			return nil, status.Error(codes.NotFound, "task not found")
+		} else {
+			slog.ErrorContext(ctx, "error checking task existence", logging.ErrKey, err)
+			return nil, status.Error(codes.Internal, "failed to check task existence")
+		}
+	} else {
+		slog.InfoContext(ctx, "task exists", "task_id", req.Id.Value, "actual_owner", existingOwner, "requesting_user", creds.Subject)
+		if existingOwner != creds.Subject.String() {
+			slog.WarnContext(ctx, "unauthorized task update attempt", "task_id", req.Id.Value, "actual_owner", existingOwner, "requesting_user", creds.Subject)
+			return nil, status.Error(codes.PermissionDenied, "you do not have permission to update this task")
+		}
+	}
+
 	var (
 		recurrenceEnabled bool
-		recurrencePattern string
+		recurrencePattern sql.NullString
 		updatedOn         time.Time
 	)
 	row := tx.QueryRowContext(ctx, query, args...)
@@ -99,6 +118,9 @@ func (s *raftaServer) UpdateTask(ctx context.Context, req *m.TaskUpdateRequest) 
 		slog.ErrorContext(ctx,
 			"failed to ingest task update",
 			logging.ErrKey, err,
+			"query", query,
+			"task_id", req.Id.Value,
+			"owner_id", creds.Subject,
 		)
 		return nil, status.Error(codes.Internal,
 			"failed to feetch updated task",
