@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/mail"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -50,7 +51,7 @@ func (s *protoServer) newUser(ctx context.Context, req *m.UserSignupRequest) (*m
 		return nil, err
 	}
 
-	hash, salt, err := sec.GenerateHash(req.UserSecret)
+	hash, salt, err := sec.GenerateHashWithThreads(req.UserSecret, getArgonThreads(s.cfg.ArgonThreads))
 	if err != nil {
 		slog.ErrorContext(ctx, "Failure to hash user password", logging.ErrKey, err)
 		return nil, status.Errorf(codes.Internal,
@@ -159,7 +160,7 @@ func (s *protoServer) updateUserCredentials(
 		return nil, err
 	}
 
-	hash, salt, err := sec.GenerateHash(passwd)
+	hash, salt, err := sec.GenerateHashWithThreads(passwd, getArgonThreads(s.cfg.ArgonThreads))
 	if err != nil {
 		slog.ErrorContext(ctx, "Failure to hash user password", logging.ErrKey, err)
 		return nil, status.Errorf(codes.Internal,
@@ -238,4 +239,16 @@ func userToPb(u database.User) *m.User {
 			UpdatedOn: timestamppb.New(u.UpdatedOn.UTC()),
 		},
 	}
+}
+
+// getArgonThreads returns the number of threads to use for Argon2.
+// If configThreads is 0, it auto-detects CPU cores.
+func getArgonThreads(configThreads uint) uint8 {
+	if configThreads == 0 {
+		return uint8(runtime.NumCPU())
+	}
+	if configThreads > 255 {
+		return 255
+	}
+	return uint8(configThreads)
 }

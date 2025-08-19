@@ -15,4 +15,5 @@ services:
       - SECRETS_PATH=/etc/secrets
       - JWT_ACCESS_TTL=720h
       - JWT_REFRESH_TTL=1m
+      - ARGON_THREADS=12
     volumes: [./.runtime:/var/run, ./.secrets:/etc/secrets]

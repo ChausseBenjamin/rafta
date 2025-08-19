@@ -36,6 +36,7 @@ type ConfigStore struct {
 	JWTAccessTTL  time.Duration
 	JWTRefreshTTL time.Duration
 	DBCacheSize   int
+	ArgonThreads  uint
 }
 
 func GetFromContext[T any](ctx context.Context, key any) *T {

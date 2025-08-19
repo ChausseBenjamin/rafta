@@ -22,6 +22,7 @@ env_vars=$(cat << EOF
   SECRETS_PATH=$localsecrets
   JWT_ACCESS_TTL=720h
   JWT_REFRESH_TTL=1m
+  ARGON_THREADS=12
   CGO_ENABLED=1
 EOF
 )

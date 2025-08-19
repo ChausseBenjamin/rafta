@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime"
 	"strings"
 	"time"
 
@@ -114,7 +115,7 @@ func (a *AuthManager) handleBasicAuth(ctx context.Context, req any, handler grpc
 		}
 		return nil, status.Error(codes.Internal, "Failed to query user credentials")
 	}
-	err = sec.ValidateCreds(credsParts[1], userSecret.Hash, userSecret.Salt)
+	err = sec.ValidateCredsWithThreads(credsParts[1], userSecret.Hash, userSecret.Salt, getArgonThreads(a.cfg.ArgonThreads))
 	if err != nil {
 		if errors.Is(err, sec.ErrInvalidCreds) {
 			return nil, status.Error(codes.Unauthenticated, "Invalid credentials provided")
@@ -281,8 +282,20 @@ func GetCreds(ctx context.Context, expects tokenType) (*Credendials, error) {
 				"Invalid token type for this endpoint. Expected: '%s', Got: '%s'", expects, creds.Type,
 			)
 		}
-		return creds, nil
 	}
+	return creds, nil
+}
+
+// getArgonThreads returns the number of threads to use for Argon2.
+// If configThreads is 0, it auto-detects CPU cores.
+func getArgonThreads(configThreads uint) uint8 {
+	if configThreads == 0 {
+		return uint8(runtime.NumCPU())
+	}
+	if configThreads > 255 {
+		return 255
+	}
+	return uint8(configThreads)
 }
 
 func NewManager(vault secrets.SecretVault, db *database.Queries, cfg *util.ConfigStore) (*AuthManager, error) {

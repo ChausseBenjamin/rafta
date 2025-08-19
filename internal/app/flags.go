@@ -31,6 +31,7 @@ const (
 	FlagAccessTokenTTL   = "access-token-time-to-live"
 	FlagRefreshTokenTTL  = "refresh-token-time-to-live"
 	FlagDBCacheSize      = "database-cache-size"
+	FlagArgonThreads     = "argon-threads"
 )
 
 func flags() []cli.Flag {
@@ -135,6 +136,12 @@ func flags() []cli.Flag {
 			Usage:   "Duration of a refresh json web token (JWT)",
 			Value:   24 * time.Hour,
 			Sources: cli.EnvVars("JWT_REFRESH_TTL"),
+		},
+		&cli.UintFlag{
+			Name:    FlagArgonThreads,
+			Usage:   "Number of threads for Argon2 password hashing (0 = auto-detect CPU cores)",
+			Value:   0,
+			Sources: cli.EnvVars("ARGON_THREADS"),
 		}, // }}}
 	}
 }

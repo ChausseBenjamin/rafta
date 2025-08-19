@@ -124,6 +124,7 @@ func initApp(ctx context.Context, cmd *cli.Command) (*grpc.Server, *sql.DB, *dat
 		JWTAccessTTL:  cmd.Duration(FlagAccessTokenTTL),
 		JWTRefreshTTL: cmd.Duration(FlagRefreshTokenTTL),
 		DBCacheSize:   int(-cmd.Uint(FlagDBCacheSize)),
+		ArgonThreads:  uint(cmd.Uint(FlagArgonThreads)),
 	}
 
 	vault, err := secrets.NewDirVault(cmd.String(FlagSecretsPath))

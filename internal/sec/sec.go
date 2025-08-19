@@ -35,6 +35,12 @@ var (
 // GenerateHash generates a hash for the given secret using the Argon2id algorithm.
 // It returns (hash, salt, error)
 func GenerateHash(secret string) (string, string, error) {
+	return GenerateHashWithThreads(secret, uint8(runtime.NumCPU()))
+}
+
+// GenerateHashWithThreads generates a hash for the given secret using the Argon2id algorithm
+// with a specific thread count. It returns (hash, salt, error)
+func GenerateHashWithThreads(secret string, threads uint8) (string, string, error) {
 	salt := make([]byte, ArgonSaltSize)
 	if _, err := rand.Read(salt); err != nil {
 		return "", "", err
@@ -51,6 +57,12 @@ func GenerateHash(secret string) (string, string, error) {
 // The stored hash is expected to be in the format "salt$hash", both base64
 // encoded.
 func ValidateCreds(passwd, hashStr, saltStr string) error {
+	return ValidateCredsWithThreads(passwd, hashStr, saltStr, uint8(runtime.NumCPU()))
+}
+
+// ValidateCredsWithThreads validates the provided secret against the stored hash
+// with a specific thread count.
+func ValidateCredsWithThreads(passwd, hashStr, saltStr string, threads uint8) error {
 	dSalt, err := base64.StdEncoding.DecodeString(saltStr)
 	if err != nil {
 		return errInvalidSaltEnc
@@ -87,7 +99,7 @@ func GenPassword() (string, string, string, error) {
 		}
 		psswd[i] = byte(n.Int64() + 32)
 	}
-	hash, salt, err := GenerateHash(string(psswd))
+	hash, salt, err := GenerateHashWithThreads(string(psswd), uint8(runtime.NumCPU()))
 	if err != nil {
 		return "", "", "", err
 	}
