@@ -15,7 +15,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func (s *raftaServer) UpdateTask(ctx context.Context, req *m.TaskUpdateRequest) (*m.TaskUpdateResponse, error) {
+func (s *raftaServer) UpdateTask(
+	ctx context.Context,
+	req *m.TaskUpdateRequest,
+) (*m.TaskUpdateResponse, error) {
 	creds, err := auth.GetCreds(ctx, auth.AccessTokenType)
 	if err != nil {
 		return nil, err
@@ -44,6 +47,7 @@ func (s *raftaServer) UpdateTask(ctx context.Context, req *m.TaskUpdateRequest) 
 	}
 	defer tx.Rollback()
 
+	var state_changed bool
 	q := bqb.New("update tasks set updated_on = CURRENT_TIMESTAMP")
 	masks := removeDuplicate(req.Masks)
 	for _, mask := range masks {
@@ -56,6 +60,7 @@ func (s *raftaServer) UpdateTask(ctx context.Context, req *m.TaskUpdateRequest) 
 			q.Concat(", priority = ?", req.Data.Desc)
 		case m.TaskFieldMask_STATE:
 			q.Concat(", state = ?", req.Data.Desc)
+			state_changed = true
 		case m.TaskFieldMask_RECURRENCE:
 			q.Concat(", recurrence_pattern = ?, recurrence_enabled = ?",
 				req.Data.Recurrence.Pattern, req.Data.Recurrence.Active,
@@ -97,10 +102,21 @@ func (s *raftaServer) UpdateTask(ctx context.Context, req *m.TaskUpdateRequest) 
 			return nil, status.Error(codes.Internal, "failed to check task existence")
 		}
 	} else {
-		slog.InfoContext(ctx, "task exists", "task_id", req.Id.Value, "actual_owner", existingOwner, "requesting_user", creds.Subject)
+		slog.InfoContext(ctx, "task exists",
+			"task_id", req.Id.Value,
+			"actual_owner", existingOwner,
+			"requesting_user", creds.Subject,
+		)
 		if existingOwner != creds.Subject.String() {
-			slog.WarnContext(ctx, "unauthorized task update attempt", "task_id", req.Id.Value, "actual_owner", existingOwner, "requesting_user", creds.Subject)
-			return nil, status.Error(codes.PermissionDenied, "you do not have permission to update this task")
+			slog.WarnContext(ctx, "unauthorized task update attempt",
+				"task_id", req.Id.Value,
+				"actual_owner", existingOwner,
+				"requesting_user", creds.Subject,
+			)
+			return nil, status.Error(
+				codes.PermissionDenied,
+				"you do not have permission to update this task",
+			)
 		}
 	}
 
@@ -127,7 +143,7 @@ func (s *raftaServer) UpdateTask(ctx context.Context, req *m.TaskUpdateRequest) 
 		)
 	}
 
-	if recurrenceEnabled {
+	if recurrenceEnabled && state_changed {
 		if err := s.rescheduleTask(ctx, taskID, tx); err != nil {
 			return nil, err
 		}
@@ -143,8 +159,15 @@ func (s *raftaServer) UpdateTask(ctx context.Context, req *m.TaskUpdateRequest) 
 	return nil, nil
 }
 
-func (s *raftaServer) rescheduleTask(ctx context.Context, taskID uuid.UUID, tx *sql.Tx) error {
-	return status.Error(codes.Unimplemented, "Recurrence isn't configured yet, aborting")
+func (s *raftaServer) rescheduleTask(ctx context.Context, id uuid.UUID, _ *sql.Tx) error {
+	// With task scheduling being unimplemented at the moment, return an error
+	// would block any task containing recurrence info of being updated/used.
+	// nil is returned instead of UNIMPLEMENTED to allow users to still use those
+	// tasks despite that.
+	slog.WarnContext(ctx, "Recurrence isn't currently implemented, skipping reschedule",
+		"task_id", id,
+	)
+	return nil
 }
 
 func removeDuplicate[T comparable](sliceList []T) []T {
