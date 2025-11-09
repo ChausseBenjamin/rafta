@@ -57,9 +57,9 @@ func (s *raftaServer) UpdateTask(
 		case m.TaskFieldMask_DESC:
 			q.Concat(", description = ?", req.Data.Desc)
 		case m.TaskFieldMask_PRIORITY:
-			q.Concat(", priority = ?", req.Data.Desc)
+			q.Concat(", priority = ?", req.Data.Priority)
 		case m.TaskFieldMask_STATE:
-			q.Concat(", state = ?", req.Data.Desc)
+			q.Concat(", state = ?", req.Data.State)
 			state_changed = true
 		case m.TaskFieldMask_RECURRENCE:
 			q.Concat(", recurrence_pattern = ?, recurrence_enabled = ?",
