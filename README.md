@@ -10,12 +10,14 @@
 
 ## Why?
 
-Most TODO apps suck for power users:
+Most TODO tools suck for power users:
 
-- **In your way**: You have to *go to them*. They don't notify, integrate, or stay out of your workflow.
+- **In your way**: You have to *go to them*. They don't notify you, or embed into your workflow.
 - **Overkill**: Many try to be wikis, calendars, or even programming platforms.
 - **Walled gardens**: APIs locked behind subscriptions or bad docs.
 - **Hard to extend**: Monolithic or closed-source.
+- **Stuck in files**: Forcing you to setup/use cloud storage like Dropbox, iCloud,
+  SyncThing just to keep your tasks in sync accross devices.
 
 Rafta flips that:
 
@@ -23,6 +25,8 @@ Rafta flips that:
 - A **clean schema** designed for anyone to build clients.
 - **No scope creep** — task management, nothing more.
 - **Built for hackers** — SQLite backend, no lock-in.
+- Self-hosted **Server Approach** - Ensuring a common source of truth for all
+  your devices
 
 If you want a TODO system that *stays out of your way* and works wherever *you*
 work (Neovim, shell, mobile, etc.), take part in the development of rafta.
@@ -57,7 +61,7 @@ flowchart LR
 
 ## Why not existing tools?
 
-- **[Orgmode][1]** / **[TodoTxt][2]** / **[Vimwiki][6]**: Fragile text parsing, sync issues.
+- **[Orgmode][1]** / **[TodoTxt][2]** / **[Vimwiki][6]**: Fragile text parsing, sync requires **all** clients to support the specific cloud hosting *you* chose.
 - **[Obsidian][3]**: Closed source, poor plugin interop.
 - **[Todoist][4]**: Great UX, but API is paywalled.
 - **[Apple Reminders][5]**: Locked to macOS/iOS.
